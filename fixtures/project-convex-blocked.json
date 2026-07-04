@@ -1,0 +1,18 @@
+{
+  "name": "acme-convex",
+  "scope": "@acme",
+  "topology": "web",
+  "backend": "convex",
+  "auth": "clerk",
+  "i18n": "gt-next",
+  "ui": "shadcn-base-ui",
+  "modules": ["authorization"],
+  "payment": {
+    "enabled": false,
+    "processors": [],
+    "orchestration": "backend-mediated",
+    "primary": null
+  },
+  "locales": ["en"],
+  "defaultLocale": "en"
+}
