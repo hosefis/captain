@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hardBlocks": [],
+  "agentMode": {
+    "softWarnToBlock": true
+  },
+  "humanMode": {
+    "softWarnConfirm": true
+  },
+  "payment": {}
+}

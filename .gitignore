@@ -1,0 +1,32 @@
+node_modules/
+dist/
+.env
+.env.*
+*.log
+.DS_Store
+
+# Editor specific files
+.vscode/
+.idea/
+*.sw?
+*.sublime-workspace
+*.sublime-project
+*.code-workspace
+.history/
+.vscode-test/
+.vscode-remote/
+.vscode-server/
+
+# Cursor-specific files and directories
+.cursor/
+.cursor.json
+.cursor-history/
+
+# Claude-specific files and directories (Anthropic's Claude, typically temp/history)
+.claude/
+claude/
+claude-logs/
+claude-history/
+anthropic/
+anthropic-logs/
+anthropic-history/
