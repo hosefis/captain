@@ -77,6 +77,8 @@ describe("resolveBootstrapPlan", () => {
       "bootstrap-apps-mobile",
     ]);
     expect(formatBootstrapCommand(steps[0]!)).toContain("create-turbo@latest");
+    expect(formatBootstrapCommand(steps[0]!)).toContain("--example");
+    expect(formatBootstrapCommand(steps[0]!)).toContain("basic");
     expect(formatBootstrapCommand(steps[1]!)).toContain("apps/web");
     expect(formatBootstrapCommand(steps[2]!)).toContain("apps/mobile");
   });

@@ -42,6 +42,25 @@ function expoAppArgs(targetDir: string): string[] {
   return ["create-expo-app@latest", targetDir, "--template", "blank-typescript"];
 }
 
+function turboArgs(config: NormalizedProjectConfig): string[] {
+  const pmFlag =
+    config.packageManager === "pnpm"
+      ? "pnpm"
+      : config.packageManager === "bun"
+        ? "bun"
+        : "npm";
+
+  return [
+    "create-turbo@latest",
+    ".",
+    "--example",
+    "basic",
+    "--skip-install",
+    "--package-manager",
+    pmFlag,
+  ];
+}
+
 function spawnStep(
   id: string,
   description: string,
@@ -98,7 +117,7 @@ export function resolveBootstrapPlan(
       "bootstrap-monorepo",
       "Scaffold Turborepo monorepo base",
       config.packageManager,
-      ["create-turbo@latest", "."],
+      turboArgs(config),
       targetDirectory,
     ),
   );

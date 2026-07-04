@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import * as p from "@clack/prompts";
 import type { GlobalCliOptions } from "../cli-options.js";
+import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
 import { runWizard } from "../prompts/wizard.js";
 import {
   formatBootstrapCommand,
@@ -48,7 +49,24 @@ export type InitResult =
   | { status: "validation_error"; message: string }
   | { status: "blocked"; compatibility: CompatibilityResult; config: NormalizedProjectConfig }
   | { status: "dry_run"; config: NormalizedProjectConfig; compatibility: CompatibilityResult; plan: InitPlan }
-  | { status: "pending_execution"; config: NormalizedProjectConfig; compatibility: CompatibilityResult; plan: InitPlan };
+  | {
+      status: "success";
+      config: NormalizedProjectConfig;
+      compatibility: CompatibilityResult;
+      plan: InitPlan;
+      directory: string;
+      completedBootstrapSteps: string[];
+      appliedRecipes: string[];
+    }
+  | {
+      status: "execution_failed";
+      config: NormalizedProjectConfig;
+      compatibility: CompatibilityResult;
+      plan: InitPlan;
+      directory: string;
+      phase: "bootstrap" | "workspace" | "config";
+      message: string;
+    };
 
 export type InitOptions = GlobalCliOptions & {
   directory: string;
@@ -169,7 +187,29 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { status: "dry_run", config, compatibility, plan };
   }
 
-  return { status: "pending_execution", config, compatibility, plan };
+  const execution = await runBootstrapPhase(config, directory);
+
+  if (!execution.ok) {
+    return {
+      status: "execution_failed",
+      config,
+      compatibility,
+      plan,
+      directory,
+      phase: execution.phase,
+      message: execution.message,
+    };
+  }
+
+  return {
+    status: "success",
+    config,
+    compatibility,
+    plan,
+    directory,
+    completedBootstrapSteps: execution.completedBootstrapSteps,
+    appliedRecipes: execution.appliedRecipes,
+  };
 }
 
 function printHumanPlan(result: Extract<InitResult, { plan: InitPlan }>): void {
@@ -242,25 +282,74 @@ function handleInitResult(result: InitResult, json: boolean): never {
     process.exit(0);
   }
 
+  if (result.status === "success") {
+    const payload = {
+      status: "success",
+      directory: result.directory,
+      config: result.config,
+      completedBootstrapSteps: result.completedBootstrapSteps,
+      appliedRecipes: result.appliedRecipes,
+      pendingRecipes: result.plan.phase2.recipes.filter(
+        (step) => !result.appliedRecipes.includes(step.id),
+      ),
+      smoke: result.plan.phase3.smoke,
+    };
+
+    if (json) {
+      console.log(JSON.stringify(payload, null, 2));
+    } else {
+      p.log.success("CAPTAIN bootstrap complete (Phase 1 + workspace/config).");
+      console.log("\nCompleted bootstrap steps:");
+      for (const stepId of result.completedBootstrapSteps) {
+        console.log(`  • ${stepId}`);
+      }
+      console.log("\nApplied recipes:");
+      for (const recipeId of result.appliedRecipes) {
+        console.log(`  • ${recipeId}`);
+      }
+      const pending = payload.pendingRecipes;
+      if (pending.length > 0) {
+        console.log("\nPending Phase 2 recipes (later milestones):");
+        for (const step of pending) {
+          console.log(`  • [${step.phase}] ${step.description}`);
+        }
+      }
+      console.log(`\nNext: Phase 3 smoke — ${result.plan.phase3.smoke.join(" → ")}`);
+    }
+    process.exit(0);
+  }
+
+  if (result.status === "execution_failed") {
+    const payload = {
+      status: "error",
+      phase: result.phase,
+      message: result.message,
+      config: result.config,
+      plan: result.plan,
+    };
+
+    if (json) {
+      console.log(JSON.stringify(payload, null, 2));
+    } else {
+      console.error(`\nBootstrap failed during ${result.phase}: ${result.message}`);
+      printHumanPlan(result);
+    }
+    process.exit(1);
+  }
+
   if (json) {
     console.log(
       JSON.stringify(
         {
-          status: "pending_execution",
-          message: "Bootstrap execution is not wired yet (Milestone 3).",
-          config: result.config,
-          compatibility: result.compatibility,
-          plan: result.plan,
+          status: "error",
+          message: "Unexpected init result",
         },
         null,
         2,
       ),
     );
   } else {
-    printHumanPlan(result);
-    console.error(
-      "\nBootstrap execution is not wired yet (Milestone 3). Re-run with --dry-run to preview the plan.",
-    );
+    console.error("\nUnexpected init result.");
   }
   process.exit(1);
 }

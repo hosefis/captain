@@ -1,0 +1,16 @@
+{
+  "topology": "monorepo",
+  "description": "Turborepo base plus nested official app scaffolds",
+  "steps": [
+    "bootstrap-monorepo",
+    "bootstrap-apps-web",
+    "bootstrap-apps-mobile",
+    "bootstrap-apps-desktop"
+  ],
+  "promotion": {
+    "packages": ["core", "adapters-next", "adapters-expo", "adapters-desktop"]
+  },
+  "turbo": {
+    "replaceDefaultApps": true
+  }
+}
