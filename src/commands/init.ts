@@ -22,6 +22,12 @@ import {
 } from "../schema/project-config.js";
 import type { Command } from "commander";
 import { getGlobalOptions } from "../cli-options.js";
+import {
+  formatVerifyDocsReport,
+  runVerifyDocs,
+  type NpmFetch,
+  type VerifyDocsResult,
+} from "../validators/verify-docs.js";
 
 export type InitPlan = {
   phase1: {
@@ -48,7 +54,18 @@ export type InitResult =
   | { status: "cancelled" }
   | { status: "validation_error"; message: string }
   | { status: "blocked"; compatibility: CompatibilityResult; config: NormalizedProjectConfig }
-  | { status: "dry_run"; config: NormalizedProjectConfig; compatibility: CompatibilityResult; plan: InitPlan }
+  | {
+      status: "doc_drift_blocked";
+      config: NormalizedProjectConfig;
+      verifyDocs: VerifyDocsResult;
+    }
+  | {
+      status: "dry_run";
+      config: NormalizedProjectConfig;
+      compatibility: CompatibilityResult;
+      plan: InitPlan;
+      verifyDocs?: VerifyDocsResult;
+    }
   | {
       status: "success";
       config: NormalizedProjectConfig;
@@ -57,6 +74,7 @@ export type InitResult =
       directory: string;
       completedBootstrapSteps: string[];
       appliedRecipes: string[];
+      verifyDocs?: VerifyDocsResult;
     }
   | {
       status: "execution_failed";
@@ -70,6 +88,8 @@ export type InitResult =
 
 export type InitOptions = GlobalCliOptions & {
   directory: string;
+  /** Test hook: mock npm registry lookups for --verify-docs */
+  npmFetch?: NpmFetch;
 };
 
 function isAgentMode(options: InitOptions): boolean {
@@ -174,6 +194,18 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { status: "blocked", compatibility, config };
   }
 
+  let verifyDocs: VerifyDocsResult | undefined;
+  if (options.verifyDocs) {
+    verifyDocs = await runVerifyDocs(config, {
+      agentMode,
+      npmFetch: options.npmFetch,
+    });
+
+    if (!verifyDocs.ok) {
+      return { status: "doc_drift_blocked", config, verifyDocs };
+    }
+  }
+
   if (!agentMode) {
     const confirmed = await confirmWarnings(compatibility, options.yes ?? false);
     if (!confirmed) {
@@ -184,7 +216,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   const plan = buildInitPlan(config, directory, agentMode);
 
   if (options.dryRun) {
-    return { status: "dry_run", config, compatibility, plan };
+    return { status: "dry_run", config, compatibility, plan, verifyDocs };
   }
 
   const execution = await runBootstrapPhase(config, directory);
@@ -209,6 +241,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     directory,
     completedBootstrapSteps: execution.completedBootstrapSteps,
     appliedRecipes: execution.appliedRecipes,
+    verifyDocs,
   };
 }
 
@@ -261,17 +294,38 @@ function handleInitResult(result: InitResult, json: boolean): never {
     process.exit(1);
   }
 
+  if (result.status === "doc_drift_blocked") {
+    const payload = {
+      status: "doc_drift_blocked",
+      verifyDocs: result.verifyDocs,
+      config: result.config,
+    };
+
+    if (json) {
+      console.log(JSON.stringify(payload, null, 2));
+    } else {
+      console.error("Doc version pre-flight failed:\n");
+      console.error(formatVerifyDocsReport(result.verifyDocs));
+    }
+    process.exit(1);
+  }
+
   if (result.status === "dry_run") {
     const payload = {
       status: "dry-run",
       config: result.config,
       compatibility: result.compatibility,
       plan: result.plan,
+      verifyDocs: result.verifyDocs,
     };
 
     if (json) {
       console.log(JSON.stringify(payload, null, 2));
     } else {
+      if (result.verifyDocs) {
+        console.log(formatVerifyDocsReport(result.verifyDocs));
+        console.log("");
+      }
       printHumanPlan(result);
       if (result.compatibility.warns.length > 0) {
         console.log("\nWarnings:");
@@ -293,11 +347,16 @@ function handleInitResult(result: InitResult, json: boolean): never {
         (step) => !result.appliedRecipes.includes(step.id),
       ),
       smoke: result.plan.phase3.smoke,
+      verifyDocs: result.verifyDocs,
     };
 
     if (json) {
       console.log(JSON.stringify(payload, null, 2));
     } else {
+      if (result.verifyDocs) {
+        console.log(formatVerifyDocsReport(result.verifyDocs));
+        console.log("");
+      }
       p.log.success("CAPTAIN init complete (Phase 1 + Phase 2 recipes).");
       console.log("\nCompleted bootstrap steps:");
       for (const stepId of result.completedBootstrapSteps) {

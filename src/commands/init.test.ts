@@ -59,6 +59,61 @@ describe("runInit", () => {
 
     expect(result.status).toBe("validation_error");
   });
+
+  it("includes verify-docs report on dry-run when enabled", async () => {
+    const result = await runInit({
+      directory: "./my-app",
+      config: join(fixturesDir, "project-web.json"),
+      yes: true,
+      dryRun: true,
+      json: false,
+      verifyDocs: true,
+      npmFetch: async (packageName) => ({
+        ok: true,
+        version:
+          packageName === "create-next-app"
+            ? "15.3.4"
+            : packageName === "@clerk/nextjs"
+              ? "6.22.0"
+              : packageName === "gt-next" || packageName === "gtx-cli"
+                ? "1.2.0"
+                : "2.5.0",
+      }),
+    });
+
+    expect(result.status).toBe("dry_run");
+    if (result.status !== "dry_run") {
+      return;
+    }
+
+    expect(result.verifyDocs?.ok).toBe(true);
+    expect(result.verifyDocs?.entries.length).toBeGreaterThan(0);
+  });
+
+  it("blocks agent init on major doc drift", async () => {
+    const result = await runInit({
+      directory: "./my-app",
+      config: join(fixturesDir, "project-web.json"),
+      yes: true,
+      dryRun: true,
+      json: false,
+      verifyDocs: true,
+      npmFetch: async (packageName) => ({
+        ok: true,
+        version: packageName === "create-next-app" ? "16.0.0" : "1.0.0",
+      }),
+    });
+
+    expect(result.status).toBe("doc_drift_blocked");
+    if (result.status !== "doc_drift_blocked") {
+      return;
+    }
+
+    expect(result.verifyDocs.ok).toBe(false);
+    expect(result.verifyDocs.blocks.some((block) => block.package === "create-next-app")).toBe(
+      true,
+    );
+  });
 });
 
 describe("buildInitPlan", () => {

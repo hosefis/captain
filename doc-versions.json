@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "validatedAt": "2026-07-01",
+  "packages": {
+    "create-next-app": {
+      "validated": "15.3.4",
+      "docs": "https://nextjs.org/docs/app/getting-started/installation"
+    },
+    "create-expo-app": {
+      "validated": "3.4.2",
+      "docs": "https://docs.expo.dev/get-started/create-a-project/"
+    },
+    "create-turbo": {
+      "validated": "2.5.4",
+      "docs": "https://turbo.build/repo/docs/getting-started/installation"
+    },
+    "@clerk/nextjs": {
+      "validated": "6.22.0",
+      "docs": "https://clerk.com/docs/quickstarts/nextjs"
+    },
+    "@clerk/expo": {
+      "validated": "2.11.0",
+      "docs": "https://clerk.com/docs/quickstarts/expo"
+    },
+    "expo-secure-store": {
+      "validated": "14.2.3",
+      "docs": "https://docs.expo.dev/versions/latest/sdk/securestore/"
+    },
+    "gt-next": {
+      "validated": "1.2.0",
+      "docs": "https://generaltranslation.com/en-US/docs/next/guides/quickstart"
+    },
+    "gtx-cli": {
+      "validated": "1.2.0",
+      "docs": "https://generaltranslation.com/en-US/docs/cli"
+    },
+    "gt-react-native": {
+      "validated": "1.2.0",
+      "docs": "https://generaltranslation.com/en-US/docs/react-native/tutorials/quickstart-expo"
+    },
+    "expo-localization": {
+      "validated": "16.1.5",
+      "docs": "https://docs.expo.dev/guides/localization/"
+    },
+    "shadcn": {
+      "validated": "2.5.0",
+      "docs": "https://ui.shadcn.com/docs/changelog/2026-01-base-ui"
+    },
+    "nativewind": {
+      "validated": "4.1.23",
+      "docs": "https://www.nativewind.dev/getting-started/expo"
+    },
+    "tailwindcss": {
+      "validated": "4.1.8",
+      "docs": "https://tailwindcss.com/docs/installation"
+    }
+  }
+}

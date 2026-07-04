@@ -15,7 +15,8 @@
     "dist",
     "recipes",
     "templates",
-    "compatibility.json"
+    "compatibility.json",
+    "doc-versions.json"
   ],
   "scripts": {
     "build": "tsup",
