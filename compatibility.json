@@ -1,11 +1,218 @@
 {
   "version": 1,
-  "hardBlocks": [],
   "agentMode": {
-    "softWarnToBlock": true
+    "softWarn": "upgrade-to-block"
   },
   "humanMode": {
-    "softWarnConfirm": true
+    "softWarn": "confirm-prompt"
   },
-  "payment": {}
+  "hardBlocks": [
+    {
+      "id": "expo-next-intl",
+      "stack": "expo",
+      "i18n": "next-intl",
+      "message": "next-intl is for Next.js only; use gt-react-native or react-i18next on Expo."
+    },
+    {
+      "id": "expo-gt-next",
+      "stack": "expo",
+      "i18n": "gt-next",
+      "message": "gt-next is for Next.js only; use gt-react-native on Expo."
+    },
+    {
+      "id": "next-gt-react-native",
+      "stack": "next",
+      "i18n": "gt-react-native",
+      "message": "gt-react-native is for Expo only; use gt-next or next-intl on Next.js."
+    },
+    {
+      "id": "expo-gt-rn-expo-go",
+      "stack": "expo",
+      "i18n": "gt-react-native",
+      "runtime": "expo-go",
+      "message": "gt-react-native requires a dev build — not compatible with Expo Go."
+    },
+    {
+      "id": "expo-authjs",
+      "stack": "expo",
+      "auth": "authjs",
+      "message": "Auth.js is not supported on Expo; use clerk, better-auth, or workos."
+    }
+  ],
+  "softWarns": [
+    {
+      "id": "expo-gt-rn-experimental",
+      "stack": "expo",
+      "i18n": "gt-react-native",
+      "humanOnly": true,
+      "message": "gt-react-native is experimental on Expo — prefer dev-build and verify GT Expo docs."
+    },
+    {
+      "id": "expo-better-auth",
+      "stack": "expo",
+      "auth": "better-auth",
+      "message": "better-auth on Expo uses the API Routes pattern — verify your backend setup."
+    },
+    {
+      "id": "electron-workos-pkce",
+      "stack": "electron",
+      "auth": "workos",
+      "message": "WorkOS on desktop requires PKCE via system browser — Electron adapter is slot-only in v1."
+    },
+    {
+      "id": "expo-mor-native-sheet",
+      "stack": "expo",
+      "paymentProcessor": "lemon-squeezy",
+      "message": "Global MoR processors on Expo should use hosted browser checkout, not native PaymentSheet."
+    },
+    {
+      "id": "expo-mor-paddle",
+      "stack": "expo",
+      "paymentProcessor": "paddle",
+      "message": "Paddle on Expo should use hosted browser checkout, not native PaymentSheet."
+    },
+    {
+      "id": "multiple-global-mor",
+      "multipleGlobalMor": true,
+      "message": "Multiple global merchant-of-record processors selected — pick one MoR per product."
+    },
+    {
+      "id": "fedapay-provider-direct",
+      "paymentProcessor": "fedapay",
+      "orchestration": "provider-direct",
+      "message": "FedaPay with provider-direct needs server routes for IPN — prefer backend-mediated or aggregator-hosted."
+    }
+  ],
+  "recipeBlocks": [
+    {
+      "id": "backend-convex",
+      "backend": "convex",
+      "message": "backend: convex recipes are not implemented yet — use rest for Tier A or wait for a future release."
+    },
+    {
+      "id": "backend-supabase",
+      "backend": "supabase",
+      "message": "backend: supabase recipes are not implemented yet — use rest for Tier A."
+    },
+    {
+      "id": "backend-firebase",
+      "backend": "firebase",
+      "message": "backend: firebase recipes are not implemented yet — use rest for Tier A."
+    },
+    {
+      "id": "auth-better-auth",
+      "auth": "better-auth",
+      "message": "auth: better-auth recipes are not implemented yet — use clerk for Tier A."
+    },
+    {
+      "id": "auth-workos",
+      "auth": "workos",
+      "message": "auth: workos recipes are not implemented yet — use clerk for Tier A."
+    },
+    {
+      "id": "auth-skip",
+      "auth": "skip",
+      "message": "auth: skip path is not implemented yet — select clerk or wait for a future release."
+    },
+    {
+      "id": "i18n-next-intl",
+      "i18n": "next-intl",
+      "message": "i18n: next-intl recipes are not implemented yet — use gt-next on web for Tier A."
+    },
+    {
+      "id": "i18n-react-i18next",
+      "i18n": "react-i18next",
+      "message": "i18n: react-i18next recipes are not implemented yet — use gt-react-native on mobile for Tier A."
+    },
+    {
+      "id": "ui-shadcn-radix",
+      "ui": "shadcn-radix",
+      "message": "ui: shadcn-radix recipes are not implemented yet — use shadcn-base-ui for Tier A."
+    },
+    {
+      "id": "ui-tailwind-only",
+      "ui": "tailwind-only",
+      "message": "ui: tailwind-only recipes are not implemented yet — use shadcn-base-ui for Tier A."
+    },
+    {
+      "id": "ui-paper",
+      "ui": "paper",
+      "message": "ui: React Native Paper recipes are not implemented yet — use nativewind for Tier A."
+    },
+    {
+      "id": "ui-none",
+      "ui": "none",
+      "message": "ui: none (mobile) recipes are not implemented yet — use nativewind for Tier A."
+    },
+    {
+      "id": "module-admin-catalog",
+      "module": "admin-catalog",
+      "message": "module: admin-catalog emission on init is not implemented yet — use scaffold:catalog after init."
+    },
+    {
+      "id": "module-form-wizard",
+      "module": "form-wizard",
+      "message": "module: form-wizard is not implemented yet — add via add-module in a future release."
+    },
+    {
+      "id": "module-user-identity",
+      "module": "user-identity",
+      "message": "module: user-identity is not implemented yet — add via add-module in a future release."
+    },
+    {
+      "id": "module-payment",
+      "module": "payment",
+      "message": "module: payment checkout recipes are not implemented yet — disable payment for Tier A."
+    },
+    {
+      "id": "topology-desktop",
+      "app": "desktop",
+      "message": "apps/desktop is slot-only in v1 — Electron bootstrap is not implemented yet."
+    }
+  ],
+  "payment": {
+    "implementedProcessors": ["clerk-billing", "custom-api", "fedapay", "paystack"],
+    "scaffoldProcessors": [
+      "lemon-squeezy",
+      "polar",
+      "paddle",
+      "flutterwave",
+      "paydunya",
+      "cinetpay"
+    ],
+    "globalMorProcessors": ["stripe", "lemon-squeezy", "polar", "paddle", "clerk-billing"],
+    "allowedCombos": [
+      {
+        "id": "clerk-stripe-billing",
+        "auth": "clerk",
+        "paymentProcessor": "stripe",
+        "message": "auth: clerk + payments: stripe uses Clerk Billing by default."
+      },
+      {
+        "id": "convex-polar",
+        "backend": "convex",
+        "paymentProcessor": "polar",
+        "message": "backend: convex + payments: polar pairs with @convex-dev/polar."
+      },
+      {
+        "id": "rest-custom-api",
+        "backend": "rest",
+        "paymentProcessor": "custom-api",
+        "message": "backend: rest + payments: custom-api uses the Zibee-style REST adapter."
+      }
+    ],
+    "processorBlocks": [
+      {
+        "id": "processor-stripe-direct",
+        "paymentProcessor": "stripe",
+        "unlessAuth": "clerk",
+        "message": "payments: stripe without auth: clerk requires a direct Stripe recipe (not implemented) — use clerk + stripe for Clerk Billing."
+      },
+      {
+        "id": "processor-scaffold",
+        "paymentProcessor": "scaffold",
+        "message": "This payment processor recipe is scaffold-only and not wired in v1."
+      }
+    ]
+  }
 }
