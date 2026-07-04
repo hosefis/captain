@@ -1,0 +1,9 @@
+{
+  "{i18nNamespace}": {
+    "title": "{resourceTitle}",
+    "create": "Create {resourceTitle}",
+    "edit": "Edit {resourceTitle}",
+    "archive": "Archive",
+    "restore": "Restore"
+  }
+}

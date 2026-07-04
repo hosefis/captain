@@ -1,0 +1,11 @@
+{
+  "payment": {
+    "checkout": {
+      "title": "Paiement",
+      "pending": "En attente de confirmation du paiement…",
+      "success": "Paiement réussi",
+      "failed": "Échec du paiement",
+      "timeout": "Délai de paiement dépassé"
+    }
+  }
+}

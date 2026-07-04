@@ -145,11 +145,6 @@
       "message": "ui: none (mobile) recipes are not implemented yet — use nativewind for Tier A."
     },
     {
-      "id": "module-admin-catalog",
-      "module": "admin-catalog",
-      "message": "module: admin-catalog emission on init is not implemented yet — use scaffold:catalog after init."
-    },
-    {
       "id": "module-form-wizard",
       "module": "form-wizard",
       "message": "module: form-wizard is not implemented yet — add via add-module in a future release."
@@ -158,11 +153,6 @@
       "id": "module-user-identity",
       "module": "user-identity",
       "message": "module: user-identity is not implemented yet — add via add-module in a future release."
-    },
-    {
-      "id": "module-payment",
-      "module": "payment",
-      "message": "module: payment checkout recipes are not implemented yet — disable payment for Tier A."
     },
     {
       "id": "topology-desktop",

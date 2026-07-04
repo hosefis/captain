@@ -189,17 +189,11 @@ describe("resolveCompatibility recipe blocks (Tier B)", () => {
     }
   });
 
-  it("blocks optional modules until implemented", () => {
-    for (const moduleName of ["admin-catalog", "form-wizard", "user-identity", "payment"] as const) {
+  it("blocks unimplemented optional modules", () => {
+    for (const moduleName of ["form-wizard", "user-identity"] as const) {
       const config = normalizeProjectConfig(
         baseConfig({
           modules: ["authorization", moduleName],
-          payment: {
-            enabled: moduleName === "payment",
-            processors: moduleName === "payment" ? ["custom-api"] : [],
-            orchestration: "backend-mediated",
-            primary: moduleName === "payment" ? "custom-api" : null,
-          },
         }),
       );
 
@@ -207,6 +201,28 @@ describe("resolveCompatibility recipe blocks (Tier B)", () => {
       expect(result.ok).toBe(false);
       expect(result.blocks.some((block) => block.id === `module-${moduleName}`)).toBe(true);
     }
+  });
+
+  it("allows admin-catalog and payment modules when recipes exist", () => {
+    const adminCatalog = normalizeProjectConfig(
+      baseConfig({
+        modules: ["authorization", "admin-catalog"],
+      }),
+    );
+    expect(resolveCompatibility(adminCatalog, { matrix, mode: "agent" }).ok).toBe(true);
+
+    const payment = normalizeProjectConfig(
+      baseConfig({
+        modules: ["authorization", "payment"],
+        payment: {
+          enabled: true,
+          processors: ["custom-api"],
+          orchestration: "backend-mediated",
+          primary: "custom-api",
+        },
+      }),
+    );
+    expect(resolveCompatibility(payment, { matrix, mode: "agent" }).ok).toBe(true);
   });
 
   it("blocks desktop app in monorepo", () => {
@@ -248,7 +264,7 @@ describe("resolveCompatibility payment rules", () => {
     expect(result.blocks.some((block) => block.id === "payment:scaffold:polar")).toBe(true);
   });
 
-  it("blocks stripe without clerk (direct stripe not implemented)", () => {
+  it("allows stripe with clerk (Clerk Billing path)", () => {
     const config = normalizeProjectConfig(
       baseConfig({
         auth: "clerk",
@@ -262,8 +278,9 @@ describe("resolveCompatibility payment rules", () => {
       }),
     );
 
-    const result = resolveCompatibility(config, { matrix });
-    expect(result.blocks.some((block) => block.id === "module-payment")).toBe(true);
+    const result = resolveCompatibility(config, { matrix, mode: "agent" });
+    expect(result.blocks.some((block) => block.id === "processor-stripe-direct")).toBe(false);
+    expect(result.ok).toBe(true);
   });
 
   it("soft-warns fedapay + provider-direct in human mode", () => {
@@ -280,7 +297,7 @@ describe("resolveCompatibility payment rules", () => {
     );
 
     expect(human.warns.some((warn) => warn.id === "fedapay-provider-direct")).toBe(true);
-    expect(human.ok).toBe(false);
+    expect(human.ok).toBe(true);
   });
 
   it("upgrades fedapay provider-direct warn to block in agent mode", () => {

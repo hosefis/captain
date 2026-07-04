@@ -4,6 +4,8 @@ export type RecipeVars = Record<string, string>;
 
 export function buildRecipeVars(config: NormalizedProjectConfig): RecipeVars {
   const scopeName = config.scope.replace(/^@/, "");
+  const primaryProcessor =
+    config.payment.primary ?? config.payment.processors[0] ?? "custom-api";
 
   return {
     scope: config.scope,
@@ -17,5 +19,7 @@ export function buildRecipeVars(config: NormalizedProjectConfig): RecipeVars {
     defaultLocale: config.defaultLocale,
     backend: config.backend,
     auth: config.auth,
+    orchestration: config.payment.orchestration,
+    primaryProcessor,
   };
 }
