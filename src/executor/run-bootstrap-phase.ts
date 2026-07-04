@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { resolveBootstrapPlan } from "../resolver/bootstrap.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 import { applyConfigEmit } from "./config-emit.js";
+import { applyRecipes } from "./apply-recipes.js";
 import {
   runBootstrapPlan,
   type BootstrapRunResult,
@@ -18,7 +19,7 @@ export type BootstrapPhaseResult =
     }
   | {
       ok: false;
-      phase: "bootstrap" | "workspace" | "config";
+      phase: "bootstrap" | "workspace" | "config" | "recipes";
       message: string;
       bootstrap?: BootstrapRunResult;
     };
@@ -78,9 +79,24 @@ export async function runBootstrapPhase(
     return { ok: false, phase: "config", message };
   }
 
+  const recipesResult = applyRecipes(config, targetDirectory);
+  if (!recipesResult.ok) {
+    return {
+      ok: false,
+      phase: "recipes",
+      message: `Recipe step "${recipesResult.stepId}" failed: ${recipesResult.message}`,
+    };
+  }
+
   return {
     ok: true,
     completedBootstrapSteps: bootstrapResult.completedSteps,
-    appliedRecipes: ["workspace-promote", "context-md", "env-example", "project-json"],
+    appliedRecipes: [
+      "workspace-promote",
+      "context-md",
+      "env-example",
+      "project-json",
+      ...recipesResult.appliedRecipes,
+    ],
   };
 }

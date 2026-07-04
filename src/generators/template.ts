@@ -32,7 +32,7 @@ export function copyTemplateTree(
       continue;
     }
 
-    if (entry.endsWith(".json") || entry.endsWith(".md") || entry.endsWith(".example")) {
+    if (/\.(json|md|example|ts|tsx|js|mjs|css)$/.test(entry)) {
       writeRenderedFile(sourcePath, targetPath, vars);
       continue;
     }

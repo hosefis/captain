@@ -50,6 +50,11 @@ describe("runBootstrapPhase", () => {
 
     expect(result.completedBootstrapSteps).toEqual(["bootstrap-web"]);
     expect(result.appliedRecipes).toContain("workspace-promote");
+    expect(result.appliedRecipes).toContain("backend-rest");
+    expect(result.appliedRecipes).toContain("module-authorization");
+    expect(result.appliedRecipes).toContain("auth-clerk");
+    expect(existsSync(join(targetDir, "packages", "core", "src", "backend", "client.ts"))).toBe(true);
+    expect(existsSync(join(targetDir, "packages", "core", "src", "authorization", "types.ts"))).toBe(true);
     expect(existsSync(join(targetDir, "CONTEXT.md"))).toBe(true);
     expect(existsSync(join(targetDir, ".env.example"))).toBe(true);
     expect(existsSync(join(targetDir, "project.json"))).toBe(true);

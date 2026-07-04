@@ -64,7 +64,7 @@ export type InitResult =
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
-      phase: "bootstrap" | "workspace" | "config";
+      phase: "bootstrap" | "workspace" | "config" | "recipes";
       message: string;
     };
 
@@ -298,7 +298,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
     if (json) {
       console.log(JSON.stringify(payload, null, 2));
     } else {
-      p.log.success("CAPTAIN bootstrap complete (Phase 1 + workspace/config).");
+      p.log.success("CAPTAIN init complete (Phase 1 + Phase 2 recipes).");
       console.log("\nCompleted bootstrap steps:");
       for (const stepId of result.completedBootstrapSteps) {
         console.log(`  • ${stepId}`);
@@ -309,7 +309,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
       }
       const pending = payload.pendingRecipes;
       if (pending.length > 0) {
-        console.log("\nPending Phase 2 recipes (later milestones):");
+        console.log("\nPending recipes:");
         for (const step of pending) {
           console.log(`  • [${step.phase}] ${step.description}`);
         }
