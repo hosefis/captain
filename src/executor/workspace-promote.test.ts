@@ -45,11 +45,17 @@ describe("applyWorkspacePromotion", () => {
       ) as {
         workspaces: string[];
         scripts: Record<string, string>;
+        pnpm?: { onlyBuiltDependencies?: string[] };
       };
       expect(root.workspaces).toEqual(["apps/*", "packages/*"]);
       expect(root.scripts.build).toBe("turbo build");
       expect(existsSync(join(targetDir, "pnpm-workspace.yaml"))).toBe(
         packageManager === "pnpm",
+      );
+      expect(root.pnpm?.onlyBuiltDependencies).toEqual(
+        packageManager === "pnpm"
+          ? ["@clerk/shared", "esbuild", "msw", "sharp", "unrs-resolver"]
+          : undefined,
       );
 
       const adapter = JSON.parse(

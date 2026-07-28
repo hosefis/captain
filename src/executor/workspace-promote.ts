@@ -87,6 +87,20 @@ function workspaceScripts(): Record<string, string> {
   };
 }
 
+const PNPM_ONLY_BUILT_DEPENDENCIES = [
+  "@clerk/shared",
+  "esbuild",
+  "msw",
+  "sharp",
+  "unrs-resolver",
+];
+
+function pnpmBuildPolicy(config: NormalizedProjectConfig) {
+  return config.packageManager === "pnpm"
+    ? { pnpm: { onlyBuiltDependencies: PNPM_ONLY_BUILT_DEPENDENCIES } }
+    : {};
+}
+
 function patchAppPackageName(appPath: string, packageName: string): void {
   const pkgPath = join(appPath, "package.json");
   if (!existsSync(pkgPath)) {
@@ -116,6 +130,7 @@ function writeWorkspaceRoot(
     devDependencies: {
       turbo: "^2.5.0",
     },
+    ...pnpmBuildPolicy(config),
   };
 
   writeFileSync(
@@ -195,6 +210,7 @@ function patchMonorepoRootPackage(
           ...((current.devDependencies as Record<string, string> | undefined) ?? {}),
           turbo: "^2.5.0",
         },
+        ...pnpmBuildPolicy(config),
       },
       null,
       2,
