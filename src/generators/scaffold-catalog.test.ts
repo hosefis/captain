@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
@@ -104,5 +104,44 @@ describe("scaffoldCatalogResource", () => {
       return;
     }
     expect(result.message).toContain("admin-catalog");
+  });
+
+  it("preflights every output before writing", () => {
+    const targetDir = makeTempDir();
+    const collision = join(
+      targetDir,
+      "apps",
+      "web",
+      "locales",
+      "fr",
+      "items.json",
+    );
+    mkdirSync(join(targetDir, "apps", "web", "locales", "fr"), {
+      recursive: true,
+    });
+    writeFileSync(collision, "owned");
+
+    const result = scaffoldCatalogResource({
+      resourceSlug: "items",
+      fields: [{ name: "name", type: "string" }],
+      archive: false,
+      targetDir,
+      config: webConfig,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(
+      existsSync(
+        join(
+          targetDir,
+          "packages",
+          "core",
+          "src",
+          "admin-catalog",
+          "resources",
+          "items.ts",
+        ),
+      ),
+    ).toBe(false);
   });
 });

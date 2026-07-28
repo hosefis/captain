@@ -376,6 +376,14 @@ function writeCoreIndex(
   writeFileSync(join(coreDir(targetDir), "src", "index.ts"), `${lines.join("\n")}\n`);
 }
 
+function appliedStepsForConfig(config: NormalizedProjectConfig): Set<string> {
+  return new Set(
+    resolveRecipePlan(config)
+      .filter((step) => !WORKSPACE_CONFIG_STEPS.has(step.id))
+      .map((step) => step.id),
+  );
+}
+
 function buildAdapterIndex(
   corePackage: string,
   adapterKind: "next" | "expo",
@@ -544,6 +552,32 @@ export function applyRecipes(
   }
 
   return { ok: true, appliedRecipes: [...applied] };
+}
+
+export function applyOptionalModuleRecipe(
+  config: NormalizedProjectConfig,
+  targetDir: string,
+  moduleId: "admin-catalog" | "form-wizard" | "user-identity",
+): ApplyRecipesResult {
+  const vars = buildRecipeVars(config);
+  const step: RecipeStep = {
+    id: `module-${moduleId}`,
+    phase: "module",
+    description: `Deep module: ${moduleId}`,
+  };
+
+  try {
+    applyRecipeStep(step, targetDir, config, vars);
+    writeCoreIndex(targetDir, vars, appliedStepsForConfig(config));
+    return { ok: true, appliedRecipes: [step.id] };
+  } catch (error) {
+    return {
+      ok: false,
+      stepId: step.id,
+      message:
+        error instanceof Error ? error.message : "Module recipe application failed",
+    };
+  }
 }
 
 export function recipeStepIsImplemented(stepId: string): boolean {

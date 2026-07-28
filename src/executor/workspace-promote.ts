@@ -214,12 +214,19 @@ function emitPackageSkeletons(
     workspaceRange: resolvePackageManagerDriver(config.packageManager).workspaceRange,
   };
 
-  copyTemplateTree(join(templatesDir(), "packages", "core"), join(targetDir, "packages", "core"), vars);
+  const coreTarget = join(targetDir, "packages", "core");
+  if (!existsSync(coreTarget)) {
+    copyTemplateTree(join(templatesDir(), "packages", "core"), coreTarget, vars);
+  }
 
   for (const adapterId of adapterPackageIds(config)) {
+    const adapterTarget = join(targetDir, "packages", adapterId);
+    if (existsSync(adapterTarget)) {
+      continue;
+    }
     copyTemplateTree(
       join(templatesDir(), "packages", adapterId),
-      join(targetDir, "packages", adapterId),
+      adapterTarget,
       {
         ...vars,
         adapterPackage: packageName(config.scope, adapterId),

@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import type { Command } from "commander";
 import { scaffoldCatalogResource, parseCatalogFields } from "../generators/scaffold-catalog.js";
 import { loadProjectConfigFromFile } from "../schema/project-config.js";
+import { getGlobalOptions } from "../cli-options.js";
 
 export function registerScaffoldCatalogCommand(program: Command): void {
   program
@@ -15,7 +16,8 @@ export function registerScaffoldCatalogCommand(program: Command): void {
     )
     .option("--archive", "Include archive/restore actions", false)
     .option("--project <path>", "Path to project.json", "project.json")
-    .action((resource, options: { fields: string; archive: boolean; project: string }) => {
+    .action((resource, options: { fields: string; archive: boolean; project: string }, command: Command) => {
+      const globals = getGlobalOptions(command);
       const targetDir = process.cwd();
       const projectPath = resolve(targetDir, options.project);
 
@@ -43,6 +45,8 @@ export function registerScaffoldCatalogCommand(program: Command): void {
         archive: options.archive,
         targetDir,
         config,
+        force: globals.force,
+        dryRun: globals.dryRun,
       });
 
       if (!result.ok) {
@@ -51,7 +55,26 @@ export function registerScaffoldCatalogCommand(program: Command): void {
         return;
       }
 
-      console.log(`Scaffolded admin catalog resource "${resource}":`);
+      if (globals.json) {
+        console.log(
+          JSON.stringify(
+            {
+              status: globals.dryRun ? "planned" : "success",
+              resource,
+              files: result.files,
+            },
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+
+      console.log(
+        globals.dryRun
+          ? `Would scaffold admin catalog resource "${resource}":`
+          : `Scaffolded admin catalog resource "${resource}":`,
+      );
       for (const file of result.files) {
         console.log(`  ${file}`);
       }

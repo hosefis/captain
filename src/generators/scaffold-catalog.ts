@@ -18,6 +18,8 @@ export type ScaffoldCatalogInput = {
   archive: boolean;
   targetDir: string;
   config: NormalizedProjectConfig;
+  force?: boolean;
+  dryRun?: boolean;
 };
 
 export type ScaffoldCatalogResult =
@@ -150,6 +152,37 @@ export function scaffoldCatalogResource(input: ScaffoldCatalogInput): ScaffoldCa
     "resources",
     `${resourceSlug}.ts`,
   );
+  const plannedFiles = [resourceConfigPath];
+  if (config.stacks.hasWeb) {
+    plannedFiles.push(
+      join(targetDir, "apps", "web", "app", "admin", resourceSlug, "page.tsx"),
+      join(
+        targetDir,
+        "apps",
+        "web",
+        "app",
+        "api",
+        "admin",
+        resourceSlug,
+        "route.ts",
+      ),
+      ...config.locales.map((locale) =>
+        join(targetDir, "apps", "web", "locales", locale, `${resourceSlug}.json`),
+      ),
+    );
+  }
+
+  const collisions = plannedFiles.filter((file) => existsSync(file));
+  if (collisions.length > 0 && !input.force) {
+    return {
+      ok: false,
+      message: `Unsafe catalog collisions: ${collisions.join(", ")}`,
+    };
+  }
+  if (input.dryRun) {
+    return { ok: true, files: plannedFiles };
+  }
+
   mkdirSync(join(targetDir, "packages", "core", "src", "admin-catalog", "resources"), {
     recursive: true,
   });
