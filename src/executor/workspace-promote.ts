@@ -106,6 +106,10 @@ function pnpmWorkspaceYaml(): string {
     "packages:",
     '  - "apps/*"',
     '  - "packages/*"',
+    "allowBuilds:",
+    ...PNPM_ONLY_BUILT_DEPENDENCIES.map(
+      (dependency) => `  "${dependency}": true`,
+    ),
     "onlyBuiltDependencies:",
     ...PNPM_ONLY_BUILT_DEPENDENCIES.map((dependency) => `  - "${dependency}"`),
     "",
@@ -187,10 +191,20 @@ function ensureMonorepoWorkspaceFile(
       writeFileSync(workspacePath, updated, "utf-8");
     }
     const updated = readFileSync(workspacePath, "utf-8");
-    if (!updated.includes("onlyBuiltDependencies:")) {
+    if (!updated.includes("allowBuilds:")) {
       writeFileSync(
         workspacePath,
-        `${updated.trim()}\nonlyBuiltDependencies:\n${PNPM_ONLY_BUILT_DEPENDENCIES.map(
+        `${updated.trim()}\nallowBuilds:\n${PNPM_ONLY_BUILT_DEPENDENCIES.map(
+          (dependency) => `  "${dependency}": true`,
+        ).join("\n")}\n`,
+        "utf-8",
+      );
+    }
+    const approved = readFileSync(workspacePath, "utf-8");
+    if (!approved.includes("onlyBuiltDependencies:")) {
+      writeFileSync(
+        workspacePath,
+        `${approved.trim()}\nonlyBuiltDependencies:\n${PNPM_ONLY_BUILT_DEPENDENCIES.map(
           (dependency) => `  - "${dependency}"`,
         ).join("\n")}\n`,
         "utf-8",

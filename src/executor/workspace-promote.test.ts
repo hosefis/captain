@@ -55,7 +55,7 @@ describe("applyWorkspacePromotion", () => {
       if (packageManager === "pnpm") {
         expect(
           readFileSync(join(targetDir, "pnpm-workspace.yaml"), "utf8"),
-        ).toContain('  - "sharp"');
+        ).toContain('  "sharp": true');
       }
       expect(root.pnpm?.onlyBuiltDependencies).toEqual(
         packageManager === "pnpm"
