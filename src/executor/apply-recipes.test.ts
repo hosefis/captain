@@ -75,7 +75,7 @@ describe("applyRecipes", () => {
     expect(adapterIndex).toContain("shadcnBaseUiConfig");
 
     expect(existsSync(join(targetDir, "tools", "i18n", "i18n-check.mjs"))).toBe(true);
-    expect(existsSync(join(targetDir, "apps", "web", "middleware.ts"))).toBe(true);
+    expect(existsSync(join(targetDir, "apps", "web", "proxy.ts"))).toBe(true);
     expect(
       existsSync(
         join(
@@ -87,6 +87,12 @@ describe("applyRecipes", () => {
         ),
       ),
     ).toBe(true);
+    expect(
+      readFileSync(
+        join(targetDir, "apps", "web", "app", "captain-auth-provider.tsx"),
+        "utf8",
+      ),
+    ).toContain("if (!publishableKey)");
     expect(existsSync(join(targetDir, "apps", "web", "components.json"))).toBe(
       true,
     );

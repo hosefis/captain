@@ -112,7 +112,7 @@ function applyAuthClerk(
     );
     renderModuleFile(
       "scaffold/clerk-next-middleware.ts",
-      join(appDir(targetDir, "web"), "middleware.ts"),
+      join(appDir(targetDir, "web"), "proxy.ts"),
       vars,
     );
     renderModuleFile(
