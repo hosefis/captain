@@ -58,29 +58,6 @@
       "stack": "electron",
       "auth": "workos",
       "message": "WorkOS on desktop requires PKCE via system browser — Electron adapter is slot-only in v1."
-    },
-    {
-      "id": "expo-mor-native-sheet",
-      "stack": "expo",
-      "paymentProcessor": "lemon-squeezy",
-      "message": "Global MoR processors on Expo should use hosted browser checkout, not native PaymentSheet."
-    },
-    {
-      "id": "expo-mor-paddle",
-      "stack": "expo",
-      "paymentProcessor": "paddle",
-      "message": "Paddle on Expo should use hosted browser checkout, not native PaymentSheet."
-    },
-    {
-      "id": "multiple-global-mor",
-      "multipleGlobalMor": true,
-      "message": "Multiple global merchant-of-record processors selected — pick one MoR per product."
-    },
-    {
-      "id": "fedapay-provider-direct",
-      "paymentProcessor": "fedapay",
-      "orchestration": "provider-direct",
-      "message": "FedaPay with provider-direct needs server routes for IPN — prefer backend-mediated or aggregator-hosted."
     }
   ],
   "recipeBlocks": [
@@ -145,64 +122,9 @@
       "message": "ui: none (mobile) recipes are not implemented yet — use nativewind for Tier A."
     },
     {
-      "id": "module-form-wizard",
-      "module": "form-wizard",
-      "message": "module: form-wizard is not implemented yet — add via add-module in a future release."
-    },
-    {
-      "id": "module-user-identity",
-      "module": "user-identity",
-      "message": "module: user-identity is not implemented yet — add via add-module in a future release."
-    },
-    {
       "id": "topology-desktop",
       "app": "desktop",
       "message": "apps/desktop is slot-only in v1 — Electron bootstrap is not implemented yet."
     }
-  ],
-  "payment": {
-    "implementedProcessors": ["clerk-billing", "custom-api", "fedapay", "paystack"],
-    "scaffoldProcessors": [
-      "lemon-squeezy",
-      "polar",
-      "paddle",
-      "flutterwave",
-      "paydunya",
-      "cinetpay"
-    ],
-    "globalMorProcessors": ["stripe", "lemon-squeezy", "polar", "paddle", "clerk-billing"],
-    "allowedCombos": [
-      {
-        "id": "clerk-stripe-billing",
-        "auth": "clerk",
-        "paymentProcessor": "stripe",
-        "message": "auth: clerk + payments: stripe uses Clerk Billing by default."
-      },
-      {
-        "id": "convex-polar",
-        "backend": "convex",
-        "paymentProcessor": "polar",
-        "message": "backend: convex + payments: polar pairs with @convex-dev/polar."
-      },
-      {
-        "id": "rest-custom-api",
-        "backend": "rest",
-        "paymentProcessor": "custom-api",
-        "message": "backend: rest + payments: custom-api uses the Zibee-style REST adapter."
-      }
-    ],
-    "processorBlocks": [
-      {
-        "id": "processor-stripe-direct",
-        "paymentProcessor": "stripe",
-        "unlessAuth": "clerk",
-        "message": "payments: stripe without auth: clerk requires a direct Stripe recipe (not implemented) — use clerk + stripe for Clerk Billing."
-      },
-      {
-        "id": "processor-scaffold",
-        "paymentProcessor": "scaffold",
-        "message": "This payment processor recipe is scaffold-only and not wired in v1."
-      }
-    ]
-  }
+  ]
 }

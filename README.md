@@ -5,7 +5,7 @@
 
 **CAPTAIN** — **C**reate **A**pps **P**roperly: **T**emplates, **A**dapters, **I**ntegrations, **N**ow.
 
-Scaffolds **Next.js**, **Expo**, and **Turborepo** monorepos with composable auth, i18n, UI, backend, and payment modules. Generated code is fully owned by your project — copy-out recipes, no runtime CLI dependency.
+Scaffolds **Next.js**, **Expo**, and **Turborepo** monorepos with composable auth, i18n, UI, backend, and deep modules. Generated code is fully owned by your project — copy-out recipes, no runtime CLI dependency.
 
 > **Not** [create-captain-app](https://www.npmjs.com/package/create-captain-app) — that package scaffolds Electron apps. Always invoke CAPTAIN via `create-captain`.
 
@@ -72,12 +72,6 @@ pnpm dlx create-captain migrate:to-monorepo --add mobile
     "mobile": "nativewind"
   },
   "modules": ["authorization"],
-  "payment": {
-    "enabled": false,
-    "processors": [],
-    "orchestration": "backend-mediated",
-    "primary": null
-  },
   "locales": ["en", "fr"],
   "defaultLocale": "en",
   "validation": "strict"
@@ -93,7 +87,9 @@ Full schema and compatibility rules are defined in [`SPEC.md`](SPEC.md).
 | Tier | Status |
 |------|--------|
 | **Tier A** (default web/mobile/monorepo + rest + clerk + gt-* + shadcn/nativewind) | Planned — bootstrap and recipes in progress |
-| **Tier B** (convex/supabase/firebase, non-default auth/i18n/ui, payment, extra modules) | Blocked or stubbed until recipes land |
+| **Tier B** (convex/supabase/firebase, non-default auth/i18n/ui, desktop) | Blocked until recipes land |
+
+Payment is deferred to a [separate future release](docs/specs/payment-release.md).
 
 See the [implementation plan](.cursor/plans/bootstrap_create-captain_05e9ac88.plan.md) for milestone status.
 

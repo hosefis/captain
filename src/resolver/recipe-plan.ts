@@ -1,18 +1,4 @@
-import type { NormalizedProjectConfig, PaymentProcessor } from "../schema/project-config.js";
-
-function resolvePaymentRecipeProcessors(config: NormalizedProjectConfig): PaymentProcessor[] {
-  const processors = [...config.payment.processors];
-
-  if (
-    processors.includes("stripe") &&
-    config.auth === "clerk" &&
-    !processors.includes("clerk-billing")
-  ) {
-    return processors.filter((processor) => processor !== "stripe").concat("clerk-billing");
-  }
-
-  return processors;
-}
+import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
 export type RecipeStep = {
   id: string;
@@ -114,16 +100,6 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
       phase: "module",
       description: `Deep module: ${moduleId}`,
     });
-  }
-
-  if (config.payment.enabled) {
-    for (const processor of resolvePaymentRecipeProcessors(config)) {
-      steps.push({
-        id: `payment-${processor}`,
-        phase: "adapter",
-        description: `PaymentCheckout adapter: ${processor} (${config.payment.orchestration})`,
-      });
-    }
   }
 
   return steps;

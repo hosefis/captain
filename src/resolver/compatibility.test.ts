@@ -22,12 +22,6 @@ function baseConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
     i18n: "gt-next",
     ui: "shadcn-base-ui",
     modules: ["authorization"],
-    payment: {
-      enabled: false,
-      processors: [],
-      orchestration: "backend-mediated",
-      primary: null,
-    },
     locales: ["en", "fr"],
     defaultLocale: "en",
     validation: "strict",
@@ -36,6 +30,15 @@ function baseConfig(overrides: Partial<ProjectConfig> = {}): ProjectConfig {
 }
 
 describe("projectConfigSchema", () => {
+  it("rejects deferred payment configuration with a migration hint", () => {
+    expect(() =>
+      parseProjectConfig({
+        ...baseConfig(),
+        payment: { enabled: true },
+      }),
+    ).toThrow(/docs\/specs\/payment-release\.md/);
+  });
+
   it("parses Tier A web defaults", () => {
     const config = parseProjectConfig(baseConfig());
     expect(config.topology).toBe("web");
@@ -189,7 +192,7 @@ describe("resolveCompatibility recipe blocks (Tier B)", () => {
     }
   });
 
-  it("blocks unimplemented optional modules", () => {
+  it("allows form-wizard and user-identity modules", () => {
     for (const moduleName of ["form-wizard", "user-identity"] as const) {
       const config = normalizeProjectConfig(
         baseConfig({
@@ -197,32 +200,18 @@ describe("resolveCompatibility recipe blocks (Tier B)", () => {
         }),
       );
 
-      const result = resolveCompatibility(config, { matrix });
-      expect(result.ok).toBe(false);
-      expect(result.blocks.some((block) => block.id === `module-${moduleName}`)).toBe(true);
+      const result = resolveCompatibility(config, { matrix, mode: "agent" });
+      expect(result.ok).toBe(true);
     }
   });
 
-  it("allows admin-catalog and payment modules when recipes exist", () => {
+  it("allows admin-catalog when its recipe exists", () => {
     const adminCatalog = normalizeProjectConfig(
       baseConfig({
         modules: ["authorization", "admin-catalog"],
       }),
     );
     expect(resolveCompatibility(adminCatalog, { matrix, mode: "agent" }).ok).toBe(true);
-
-    const payment = normalizeProjectConfig(
-      baseConfig({
-        modules: ["authorization", "payment"],
-        payment: {
-          enabled: true,
-          processors: ["custom-api"],
-          orchestration: "backend-mediated",
-          primary: "custom-api",
-        },
-      }),
-    );
-    expect(resolveCompatibility(payment, { matrix, mode: "agent" }).ok).toBe(true);
   });
 
   it("blocks desktop app in monorepo", () => {
@@ -237,89 +226,6 @@ describe("resolveCompatibility recipe blocks (Tier B)", () => {
 
     const result = resolveCompatibility(config, { matrix });
     expect(result.blocks.some((block) => block.id === "topology-desktop")).toBe(true);
-  });
-});
-
-describe("resolveCompatibility payment rules", () => {
-  const matrix = loadCompatibilityMatrix();
-
-  function paymentConfig(processors: ProjectConfig["payment"]["processors"]) {
-    return normalizeProjectConfig(
-      baseConfig({
-        modules: ["authorization", "payment"],
-        payment: {
-          enabled: true,
-          processors,
-          orchestration: "backend-mediated",
-          primary: processors[0] ?? null,
-        },
-      }),
-    );
-  }
-
-  it("blocks scaffold-only processors", () => {
-    const config = paymentConfig(["polar"]);
-    const result = resolveCompatibility(config, { matrix });
-    expect(result.ok).toBe(false);
-    expect(result.blocks.some((block) => block.id === "payment:scaffold:polar")).toBe(true);
-  });
-
-  it("allows stripe with clerk (Clerk Billing path)", () => {
-    const config = normalizeProjectConfig(
-      baseConfig({
-        auth: "clerk",
-        modules: ["authorization", "payment"],
-        payment: {
-          enabled: true,
-          processors: ["stripe"],
-          orchestration: "provider-direct",
-          primary: "stripe",
-        },
-      }),
-    );
-
-    const result = resolveCompatibility(config, { matrix, mode: "agent" });
-    expect(result.blocks.some((block) => block.id === "processor-stripe-direct")).toBe(false);
-    expect(result.ok).toBe(true);
-  });
-
-  it("soft-warns fedapay + provider-direct in human mode", () => {
-    const config = paymentConfig(["fedapay"]);
-    const human = resolveCompatibility(
-      normalizeProjectConfig({
-        ...config,
-        payment: {
-          ...config.payment,
-          orchestration: "provider-direct",
-        },
-      }),
-      { matrix, mode: "human" },
-    );
-
-    expect(human.warns.some((warn) => warn.id === "fedapay-provider-direct")).toBe(true);
-    expect(human.ok).toBe(true);
-  });
-
-  it("upgrades fedapay provider-direct warn to block in agent mode", () => {
-    const config = normalizeProjectConfig({
-      ...paymentConfig(["fedapay"]),
-      payment: {
-        enabled: true,
-        processors: ["fedapay"],
-        orchestration: "provider-direct",
-        primary: "fedapay",
-      },
-    });
-
-    const agent = resolveCompatibility(config, { matrix, mode: "agent" });
-    expect(agent.warns).toHaveLength(0);
-    expect(agent.blocks.some((block) => block.id === "fedapay-provider-direct")).toBe(true);
-  });
-
-  it("soft-warns multiple global MoR processors", () => {
-    const config = paymentConfig(["lemon-squeezy", "paddle"]);
-    const result = resolveCompatibility(config, { matrix, mode: "human" });
-    expect(result.warns.some((warn) => warn.id === "multiple-global-mor")).toBe(true);
   });
 });
 
@@ -339,13 +245,6 @@ describe("resolveCompatibility mode policy", () => {
         },
       ],
       recipeBlocks: [],
-      payment: {
-        implementedProcessors: [],
-        scaffoldProcessors: [],
-        globalMorProcessors: [],
-        allowedCombos: [],
-        processorBlocks: [],
-      },
     };
 
     const config = normalizeProjectConfig(
@@ -372,6 +271,6 @@ describe("loadCompatibilityMatrix", () => {
     const matrix = loadCompatibilityMatrix();
     expect(matrix.version).toBe(1);
     expect(matrix.hardBlocks.length).toBeGreaterThan(0);
-    expect(matrix.payment.implementedProcessors).toContain("custom-api");
+    expect(matrix.recipeBlocks.length).toBeGreaterThan(0);
   });
 });

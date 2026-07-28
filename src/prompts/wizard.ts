@@ -8,9 +8,7 @@ import type {
   I18nMobile,
   I18nWeb,
   NormalizedProjectConfig,
-  Orchestration,
   PackageManager,
-  PaymentProcessor,
   Topology,
   UiMobile,
   UiWeb,
@@ -93,27 +91,6 @@ const MODULE_OPTIONS: Array<{ value: CaptainModule; label: string }> = [
   { value: "admin-catalog", label: "AdminCatalog" },
   { value: "form-wizard", label: "FormWizard" },
   { value: "user-identity", label: "User Identity" },
-  { value: "payment", label: "PaymentCheckout" },
-];
-
-const PAYMENT_PROCESSOR_OPTIONS: Array<{ value: PaymentProcessor; label: string }> = [
-  { value: "clerk-billing", label: "Clerk Billing (clerk + stripe)" },
-  { value: "custom-api", label: "Custom API (REST backend)" },
-  { value: "fedapay", label: "FedaPay" },
-  { value: "paystack", label: "Paystack" },
-  { value: "stripe", label: "Stripe (via Clerk Billing when auth is clerk)" },
-  { value: "lemon-squeezy", label: "Lemon Squeezy (scaffold)" },
-  { value: "polar", label: "Polar (scaffold)" },
-  { value: "paddle", label: "Paddle (scaffold)" },
-  { value: "flutterwave", label: "Flutterwave (scaffold)" },
-  { value: "paydunya", label: "PayDunya (scaffold)" },
-  { value: "cinetpay", label: "CinetPay (scaffold)" },
-];
-
-const ORCHESTRATION_OPTIONS: Array<{ value: Orchestration; label: string }> = [
-  { value: "backend-mediated", label: "Backend-mediated (default)" },
-  { value: "provider-direct", label: "Provider-direct" },
-  { value: "aggregator-hosted", label: "Aggregator-hosted checkout" },
 ];
 
 const RUNTIME_OPTIONS: Array<{ value: ExpoRuntime; label: string }> = [
@@ -337,53 +314,6 @@ export async function runWizard(): Promise<WizardResult> {
     new Set([...(selectedModules as CaptainModule[]), "authorization"]),
   );
 
-  let payment: NormalizedProjectConfig["payment"] = {
-    enabled: false,
-    processors: [],
-    orchestration: "backend-mediated",
-    primary: null,
-  };
-
-  if (modules.includes("payment")) {
-    const processors = await p.multiselect({
-      message: "Payment processors",
-      options: PAYMENT_PROCESSOR_OPTIONS,
-      required: true,
-    });
-    if (cancelIfNeeded(processors)) {
-      return { cancelled: true };
-    }
-
-    const orchestration = await p.select({
-      message: "Payment orchestration",
-      options: ORCHESTRATION_OPTIONS,
-      initialValue: "backend-mediated" as Orchestration,
-    });
-    if (cancelIfNeeded(orchestration)) {
-      return { cancelled: true };
-    }
-
-    const processorList = processors as PaymentProcessor[];
-    const primary = await p.select({
-      message: "Primary payment processor",
-      options: processorList.map((processor) => ({
-        value: processor,
-        label: processor,
-      })),
-      initialValue: processorList[0],
-    });
-    if (cancelIfNeeded(primary)) {
-      return { cancelled: true };
-    }
-
-    payment = {
-      enabled: true,
-      processors: processorList,
-      orchestration: orchestration as Orchestration,
-      primary: primary as PaymentProcessor,
-    };
-  }
-
   const localesInput = await p.text({
     message: "Locales (comma-separated)",
     placeholder: "en, fr",
@@ -428,7 +358,6 @@ export async function runWizard(): Promise<WizardResult> {
     i18n,
     ui,
     modules,
-    payment,
     locales,
     defaultLocale: defaultLocale as string,
     runtime,

@@ -5,7 +5,6 @@ import type {
   Auth,
   Backend,
   NormalizedProjectConfig,
-  PaymentProcessor,
 } from "../schema/project-config.js";
 
 export type CompatibilityMode = "agent" | "human";
@@ -40,9 +39,6 @@ type SoftWarnRule = {
   i18n?: string;
   auth?: string;
   runtime?: string;
-  paymentProcessor?: PaymentProcessor;
-  orchestration?: string;
-  multipleGlobalMor?: boolean;
   humanOnly?: boolean;
   message: string;
 };
@@ -58,13 +54,6 @@ type RecipeBlockRule = {
   message: string;
 };
 
-type PaymentProcessorBlockRule = {
-  id: string;
-  paymentProcessor: PaymentProcessor | "scaffold";
-  unlessAuth?: Auth;
-  message: string;
-};
-
 export type CompatibilityMatrix = {
   version: number;
   agentMode: { softWarn: "upgrade-to-block" };
@@ -72,19 +61,6 @@ export type CompatibilityMatrix = {
   hardBlocks: HardBlockRule[];
   softWarns: SoftWarnRule[];
   recipeBlocks: RecipeBlockRule[];
-  payment: {
-    implementedProcessors: PaymentProcessor[];
-    scaffoldProcessors: PaymentProcessor[];
-    globalMorProcessors: PaymentProcessor[];
-    allowedCombos: Array<{
-      id: string;
-      auth?: Auth;
-      backend?: Backend;
-      paymentProcessor?: PaymentProcessor;
-      message: string;
-    }>;
-    processorBlocks: PaymentProcessorBlockRule[];
-  };
 };
 
 function findPackageRoot(startDir: string): string {
@@ -171,13 +147,6 @@ function matchesSoftWarn(
   config: NormalizedProjectConfig,
   rule: SoftWarnRule,
 ): boolean {
-  if (rule.multipleGlobalMor) {
-    const globalMor = config.payment.processors.filter((processor) =>
-      ["stripe", "lemon-squeezy", "polar", "paddle", "clerk-billing"].includes(processor),
-    );
-    return globalMor.length > 1;
-  }
-
   if (rule.stack) {
     if (!activeStacks(config).includes(rule.stack)) {
       return false;
@@ -196,23 +165,7 @@ function matchesSoftWarn(
     }
   }
 
-  if (rule.paymentProcessor !== undefined) {
-    if (!config.payment.processors.includes(rule.paymentProcessor)) {
-      return false;
-    }
-    if (rule.stack === "expo" && !config.stacks.hasMobile) {
-      return false;
-    }
-  }
-
-  if (
-    rule.orchestration !== undefined &&
-    config.payment.orchestration !== rule.orchestration
-  ) {
-    return false;
-  }
-
-  if (rule.stack === undefined && rule.paymentProcessor === undefined && !rule.multipleGlobalMor) {
+  if (rule.stack === undefined) {
     return false;
   }
 
@@ -256,75 +209,6 @@ function matchesRecipeBlock(
   return true;
 }
 
-function resolvePaymentProcessors(config: NormalizedProjectConfig): PaymentProcessor[] {
-  const processors = [...config.payment.processors];
-  if (
-    config.payment.enabled &&
-    processors.includes("stripe") &&
-    config.auth === "clerk" &&
-    !processors.includes("clerk-billing")
-  ) {
-    processors.push("clerk-billing");
-  }
-  return processors;
-}
-
-function evaluatePaymentBlocks(
-  config: NormalizedProjectConfig,
-  matrix: CompatibilityMatrix,
-): CompatibilityIssue[] {
-  if (!config.payment.enabled && !config.modules.includes("payment")) {
-    return [];
-  }
-
-  const blocks: CompatibilityIssue[] = [];
-  const processors = resolvePaymentProcessors(config);
-
-  for (const processor of processors) {
-    if (matrix.payment.scaffoldProcessors.includes(processor)) {
-      blocks.push({
-        id: `payment:scaffold:${processor}`,
-        severity: "block",
-        message: `Payment processor "${processor}" is scaffold-only in v1.`,
-        hint: "Disable payment or choose clerk-billing, custom-api, fedapay, or paystack.",
-      });
-    }
-
-    if (
-      !matrix.payment.implementedProcessors.includes(processor) &&
-      processor !== "stripe"
-    ) {
-      blocks.push({
-        id: `payment:unimplemented:${processor}`,
-        severity: "block",
-        message: `Payment processor "${processor}" is not implemented in v1.`,
-      });
-    }
-  }
-
-  for (const rule of matrix.payment.processorBlocks) {
-    if (rule.paymentProcessor === "scaffold") {
-      continue;
-    }
-
-    if (!processors.includes(rule.paymentProcessor)) {
-      continue;
-    }
-
-    if (rule.unlessAuth !== undefined && config.auth === rule.unlessAuth) {
-      continue;
-    }
-
-    blocks.push({
-      id: rule.id,
-      severity: "block",
-      message: rule.message,
-    });
-  }
-
-  return blocks;
-}
-
 export function resolveCompatibility(
   config: NormalizedProjectConfig,
   options: {
@@ -357,8 +241,6 @@ export function resolveCompatibility(
       });
     }
   }
-
-  blocks.push(...evaluatePaymentBlocks(config, matrix));
 
   for (const rule of matrix.softWarns) {
     if (matchesSoftWarn(config, rule)) {

@@ -8,12 +8,6 @@
   "i18n": "gt-next",
   "ui": "shadcn-base-ui",
   "modules": ["authorization"],
-  "payment": {
-    "enabled": false,
-    "processors": [],
-    "orchestration": "backend-mediated",
-    "primary": null
-  },
   "locales": ["en", "fr"],
   "defaultLocale": "en"
 }

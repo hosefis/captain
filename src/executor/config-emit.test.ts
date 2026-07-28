@@ -16,12 +16,6 @@ const config: NormalizedProjectConfig = {
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
   modules: ["authorization"],
-  payment: {
-    enabled: false,
-    processors: [],
-    orchestration: "backend-mediated",
-    primary: null,
-  },
   locales: ["en", "fr"],
   defaultLocale: "en",
   validation: "strict",

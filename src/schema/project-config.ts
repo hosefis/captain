@@ -16,25 +16,6 @@ export const moduleSchema = z.enum([
   "admin-catalog",
   "form-wizard",
   "user-identity",
-  "payment",
-]);
-export const paymentProcessorSchema = z.enum([
-  "stripe",
-  "clerk-billing",
-  "lemon-squeezy",
-  "polar",
-  "paddle",
-  "fedapay",
-  "paystack",
-  "flutterwave",
-  "paydunya",
-  "cinetpay",
-  "custom-api",
-]);
-export const orchestrationSchema = z.enum([
-  "provider-direct",
-  "backend-mediated",
-  "aggregator-hosted",
 ]);
 export const expoRuntimeSchema = z.enum(["expo-go", "dev-build"]);
 export const validationModeSchema = z.enum(["strict", "relaxed"]);
@@ -51,13 +32,6 @@ const i18nStackSchema = z.object({
 const uiStackSchema = z.object({
   web: uiWebSchema.optional(),
   mobile: uiMobileSchema.optional(),
-});
-
-const paymentSchema = z.object({
-  enabled: z.boolean(),
-  processors: z.array(paymentProcessorSchema),
-  orchestration: orchestrationSchema,
-  primary: paymentProcessorSchema.nullable(),
 });
 
 const i18nInputSchema = z.union([i18nWebSchema, i18nMobileSchema, i18nStackSchema]);
@@ -79,17 +53,18 @@ export const projectConfigSchema = z
     i18n: i18nInputSchema,
     ui: uiInputSchema,
     modules: z.array(moduleSchema).default(["authorization"]),
-    payment: paymentSchema.default({
-      enabled: false,
-      processors: [],
-      orchestration: "backend-mediated",
-      primary: null,
-    }),
+    payment: z
+      .never({
+        error:
+          "payment is deferred from this release; see docs/specs/payment-release.md",
+      })
+      .optional(),
     locales: z.array(z.string().min(2)).min(1).default(["en", "fr"]),
     defaultLocale: z.string().min(2).default("en"),
     runtime: expoRuntimeSchema.optional(),
     validation: validationModeSchema.default("strict"),
   })
+  .transform(({ payment: _payment, ...config }) => config)
   .superRefine((config, ctx) => {
     if (config.topology === "monorepo") {
       if (!config.apps || config.apps.length === 0) {
@@ -106,35 +81,6 @@ export const projectConfigSchema = z
         code: "custom",
         message: "defaultLocale must be included in locales[]",
         path: ["defaultLocale"],
-      });
-    }
-
-    const paymentModuleSelected = config.modules.includes("payment");
-    if (paymentModuleSelected && !config.payment.enabled) {
-      ctx.addIssue({
-        code: "custom",
-        message: 'payment module requires payment.enabled: true',
-        path: ["payment", "enabled"],
-      });
-    }
-
-    if (config.payment.enabled && config.payment.processors.length === 0) {
-      ctx.addIssue({
-        code: "custom",
-        message: "payment.enabled requires at least one processor",
-        path: ["payment", "processors"],
-      });
-    }
-
-    if (
-      config.payment.primary !== null &&
-      config.payment.enabled &&
-      !config.payment.processors.includes(config.payment.primary)
-    ) {
-      ctx.addIssue({
-        code: "custom",
-        message: "payment.primary must be one of payment.processors",
-        path: ["payment", "primary"],
       });
     }
 
@@ -166,8 +112,6 @@ export type I18nMobile = z.infer<typeof i18nMobileSchema>;
 export type UiWeb = z.infer<typeof uiWebSchema>;
 export type UiMobile = z.infer<typeof uiMobileSchema>;
 export type CaptainModule = z.infer<typeof moduleSchema>;
-export type PaymentProcessor = z.infer<typeof paymentProcessorSchema>;
-export type Orchestration = z.infer<typeof orchestrationSchema>;
 export type ExpoRuntime = z.infer<typeof expoRuntimeSchema>;
 
 export type NormalizedI18n = {

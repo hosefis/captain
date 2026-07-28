@@ -17,12 +17,6 @@ const webConfig: NormalizedProjectConfig = {
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
   modules: ["authorization"],
-  payment: {
-    enabled: false,
-    processors: [],
-    orchestration: "backend-mediated",
-    primary: null,
-  },
   locales: ["en", "fr"],
   defaultLocale: "en",
   validation: "strict",
@@ -128,50 +122,6 @@ describe("applyRecipes", () => {
     expect(adapterIndex).toContain("nativeWindConfig");
   });
 
-  it("emits payment module and custom-api adapter", () => {
-    const targetDir = makeTempDir();
-    seedWebWorkspace(targetDir);
-    applyWorkspacePromotion(webConfig, targetDir);
-
-    const paymentConfig: NormalizedProjectConfig = {
-      ...webConfig,
-      modules: ["authorization", "payment"],
-      payment: {
-        enabled: true,
-        processors: ["custom-api"],
-        orchestration: "backend-mediated",
-        primary: "custom-api",
-      },
-    };
-
-    const result = applyRecipes(paymentConfig, targetDir);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-
-    expect(result.appliedRecipes).toContain("module-payment");
-    expect(result.appliedRecipes).toContain("payment-custom-api");
-
-    const coreIndex = readFileSync(join(targetDir, "packages", "core", "src", "index.ts"), "utf-8");
-    expect(coreIndex).toContain("initiateCheckout");
-    expect(coreIndex).toContain("PendingPaymentScreen");
-
-    expect(
-      existsSync(join(targetDir, "packages", "core", "src", "payment", "checkout.ts")),
-    ).toBe(true);
-    expect(
-      existsSync(
-        join(targetDir, "packages", "adapters-next", "src", "payment", "custom-api.ts"),
-      ),
-    ).toBe(true);
-    expect(
-      existsSync(join(targetDir, "apps", "web", "app", "api", "webhooks", "payment", "route.ts")),
-    ).toBe(true);
-    expect(existsSync(join(targetDir, "apps", "web", "locales", "en", "payment.json"))).toBe(true);
-  });
-
   it("emits admin-catalog module on init", () => {
     const targetDir = makeTempDir();
     seedWebWorkspace(targetDir);
@@ -198,4 +148,5 @@ describe("applyRecipes", () => {
       existsSync(join(targetDir, "packages", "core", "src", "admin-catalog", "driver.ts")),
     ).toBe(true);
   });
+
 });
