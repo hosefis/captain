@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
 import { normalizeProjectConfig, parseProjectConfig, type ProjectConfig } from "../schema/project-config.js";
 import { resolveSmokeSteps, runSmokeValidation } from "../validators/smoke.js";
+import { resolvePackageManagerDriver } from "../executor/package-manager.js";
+import type { PackageManager } from "../schema/project-config.js";
 
 function tierABase(overrides: Partial<ProjectConfig>): ProjectConfig {
   return {
@@ -68,33 +70,37 @@ function makeTempDir(label: string): string {
 }
 
 describe("Tier A golden fixtures (pre-publish matrix)", () => {
-  for (const fixture of tierAFixtures) {
-    it(`scaffolds ${fixture.id} and passes agent smoke plan`, async () => {
-      const directory = makeTempDir(fixture.id);
+  for (const packageManager of ["pnpm", "npm", "bun"] as PackageManager[]) {
+    for (const fixture of tierAFixtures) {
+      it(`scaffolds ${packageManager} ${fixture.id} and passes agent smoke plan`, async () => {
+        const config = { ...fixture.config, packageManager };
+        const directory = makeTempDir(fixture.id);
 
-      const bootstrap = await runBootstrapPhase(fixture.config, directory, {
-        bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
-        simulateBootstrapOutput: true,
+        const bootstrap = await runBootstrapPhase(config, directory, {
+          bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+          simulateBootstrapOutput: true,
+        });
+
+        expect(bootstrap.ok).toBe(true);
+        if (!bootstrap.ok) {
+          return;
+        }
+
+        const smokeSteps = resolveSmokeSteps(config, true);
+        expect(smokeSteps).toEqual(["typecheck", "lint", "build"]);
+
+        const smoke = await runSmokeValidation(directory, smokeSteps, {
+          packageManager,
+          runner: async (step, command, args) => {
+            expect({ command, args }).toEqual(
+              resolvePackageManagerDriver(packageManager).runScript(step),
+            );
+            return { exitCode: 0, stdout: "", stderr: "" };
+          },
+        });
+
+        expect(smoke.ok).toBe(true);
       });
-
-      expect(bootstrap.ok).toBe(true);
-      if (!bootstrap.ok) {
-        return;
-      }
-
-      const smokeSteps = resolveSmokeSteps(fixture.config, true);
-      expect(smokeSteps).toEqual(["typecheck", "lint", "build"]);
-
-      const smoke = await runSmokeValidation(directory, smokeSteps, {
-        packageManager: fixture.config.packageManager,
-        runner: async (step, command, args) => {
-          expect(command).toBe("pnpm");
-          expect(args).toEqual(["run", step]);
-          return { exitCode: 0, stdout: "", stderr: "" };
-        },
-      });
-
-      expect(smoke.ok).toBe(true);
-    });
+    }
   }
 });

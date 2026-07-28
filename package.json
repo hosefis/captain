@@ -22,7 +22,9 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
     "test": "vitest run",
+    "test:matrix": "vitest run src/integration/tier-a-golden.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {
