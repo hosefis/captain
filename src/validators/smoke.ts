@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { execa } from "execa";
 import { resolveSmokePlan } from "../resolver/recipe-plan.js";
 import type { NormalizedProjectConfig, PackageManager } from "../schema/project-config.js";
+import { resolvePackageManagerDriver } from "../executor/package-manager.js";
 
 export type SmokeStep = "typecheck" | "lint" | "build";
 
@@ -47,13 +48,7 @@ export function resolveSmokeCommand(
   step: SmokeStep,
   packageManager: PackageManager,
 ): { command: string; args: string[] } {
-  if (packageManager === "npm") {
-    return { command: "npm", args: ["run", step] };
-  }
-  if (packageManager === "bun") {
-    return { command: "bun", args: ["run", step] };
-  }
-  return { command: "pnpm", args: ["run", step] };
+  return resolvePackageManagerDriver(packageManager).runScript(step);
 }
 
 function readRootScripts(directory: string): Record<string, string> | null {

@@ -10,6 +10,7 @@ import {
   type BootstrapRunner,
 } from "./bootstrap-run.js";
 import { applyWorkspacePromotion } from "./workspace-promote.js";
+import { resolvePackageManagerDriver } from "./package-manager.js";
 
 export type BootstrapPhaseResult =
   | {
@@ -19,7 +20,7 @@ export type BootstrapPhaseResult =
     }
   | {
       ok: false;
-      phase: "bootstrap" | "workspace" | "config" | "recipes";
+      phase: "bootstrap" | "workspace" | "config" | "recipes" | "install";
       message: string;
       bootstrap?: BootstrapRunResult;
     };
@@ -160,9 +161,34 @@ export async function runBootstrapPhase(
     };
   }
 
+  const install = resolvePackageManagerDriver(config.packageManager).install;
+  const installResult = await runBootstrapPlan(
+    [
+      {
+        id: "install-root",
+        description: `Install ${config.packageManager} workspace dependencies`,
+        command: install.command,
+        args: install.args,
+        cwd: targetDirectory,
+      },
+    ],
+    { runner: options.bootstrapRunner },
+  );
+  if (!installResult.ok) {
+    return {
+      ok: false,
+      phase: "install",
+      message: `Root dependency installation failed (exit ${installResult.exitCode})`,
+      bootstrap: installResult,
+    };
+  }
+
   return {
     ok: true,
-    completedBootstrapSteps: bootstrapResult.completedSteps,
+    completedBootstrapSteps: [
+      ...bootstrapResult.completedSteps,
+      ...installResult.completedSteps,
+    ],
     appliedRecipes: [
       "workspace-promote",
       "context-md",

@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
@@ -29,6 +29,41 @@ function makeTempDir(prefix: string): string {
 }
 
 describe("applyWorkspacePromotion", () => {
+  it.each(["pnpm", "npm", "bun"] as const)(
+    "emits a valid %s standalone workspace",
+    (packageManager) => {
+      const targetDir = makeTempDir(`captain-${packageManager}-promote`);
+      writeFileSync(
+        join(targetDir, "package.json"),
+        JSON.stringify({ name: "temp-next", scripts: { dev: "next dev" } }),
+      );
+
+      applyWorkspacePromotion({ ...webConfig, packageManager }, targetDir);
+
+      const root = JSON.parse(
+        readFileSync(join(targetDir, "package.json"), "utf8"),
+      ) as {
+        workspaces: string[];
+        scripts: Record<string, string>;
+      };
+      expect(root.workspaces).toEqual(["apps/*", "packages/*"]);
+      expect(root.scripts.build).toBe("turbo build");
+      expect(existsSync(join(targetDir, "pnpm-workspace.yaml"))).toBe(
+        packageManager === "pnpm",
+      );
+
+      const adapter = JSON.parse(
+        readFileSync(
+          join(targetDir, "packages/adapters-next/package.json"),
+          "utf8",
+        ),
+      ) as { dependencies: Record<string, string> };
+      expect(adapter.dependencies["@acme/core"]).toBe(
+        packageManager === "npm" ? "*" : "workspace:*",
+      );
+    },
+  );
+
   it("hoists standalone web app into apps/web and creates packages", () => {
     const targetDir = makeTempDir("captain-web-promote");
 

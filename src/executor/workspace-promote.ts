@@ -10,12 +10,17 @@ import { join } from "node:path";
 import { copyTemplateTree } from "../generators/template.js";
 import { templatesDir } from "../lib/paths.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import { resolvePackageManagerDriver } from "./package-manager.js";
 
 const ROOT_RESERVED = new Set([
   "apps",
   "packages",
   "node_modules",
   "pnpm-workspace.yaml",
+  "pnpm-lock.yaml",
+  "package-lock.json",
+  "bun.lock",
+  "bun.lockb",
   "project.json",
   "CONTEXT.md",
   ".env.example",
@@ -73,30 +78,12 @@ function hoistStandaloneApp(targetDir: string, appDir: string): void {
   }
 }
 
-function workspaceScripts(config: NormalizedProjectConfig): Record<string, string> {
-  if (config.topology === "monorepo") {
-    return {
-      dev: "turbo dev",
-      build: "turbo build",
-      lint: "turbo lint",
-      typecheck: "turbo typecheck",
-    };
-  }
-
-  if (config.topology === "web") {
-    return {
-      dev: "pnpm --dir apps/web dev",
-      build: "pnpm --dir apps/web build",
-      lint: "pnpm --dir apps/web lint",
-      typecheck: "pnpm -r typecheck",
-    };
-  }
-
+function workspaceScripts(): Record<string, string> {
   return {
-    dev: "pnpm --dir apps/mobile start",
-    build: "pnpm --dir apps/mobile build",
-    lint: "pnpm -r lint",
-    typecheck: "pnpm -r typecheck",
+    dev: "turbo dev",
+    build: "turbo build",
+    lint: "turbo lint",
+    typecheck: "turbo typecheck",
   };
 }
 
@@ -115,13 +102,20 @@ function writeWorkspaceRoot(
   targetDir: string,
   config: NormalizedProjectConfig,
 ): void {
-  const workspaceYaml = `packages:\n  - "apps/*"\n  - "packages/*"\n`;
-  writeFileSync(join(targetDir, "pnpm-workspace.yaml"), workspaceYaml, "utf-8");
+  const driver = resolvePackageManagerDriver(config.packageManager);
+  if (driver.emitsPnpmWorkspace) {
+    const workspaceYaml = `packages:\n  - "apps/*"\n  - "packages/*"\n`;
+    writeFileSync(join(targetDir, "pnpm-workspace.yaml"), workspaceYaml, "utf-8");
+  }
 
   const rootPackage = {
     name: config.name,
     private: true,
-    scripts: workspaceScripts(config),
+    workspaces: ["apps/*", "packages/*"],
+    scripts: workspaceScripts(),
+    devDependencies: {
+      turbo: "^2.5.0",
+    },
   };
 
   writeFileSync(
@@ -149,7 +143,13 @@ function writeTurboJson(targetDir: string): void {
   writeFileSync(join(targetDir, "turbo.json"), `${JSON.stringify(turbo, null, 2)}\n`, "utf-8");
 }
 
-function ensureMonorepoWorkspaceFile(targetDir: string): void {
+function ensureMonorepoWorkspaceFile(
+  targetDir: string,
+  config: NormalizedProjectConfig,
+): void {
+  if (!resolvePackageManagerDriver(config.packageManager).emitsPnpmWorkspace) {
+    return;
+  }
   const workspacePath = join(targetDir, "pnpm-workspace.yaml");
   if (existsSync(workspacePath)) {
     const content = readFileSync(workspacePath, "utf-8");
@@ -186,9 +186,14 @@ function patchMonorepoRootPackage(
         ...current,
         name: config.name,
         private: true,
+        workspaces: ["apps/*", "packages/*"],
         scripts: {
           ...((current.scripts as Record<string, string> | undefined) ?? {}),
-          ...workspaceScripts(config),
+          ...workspaceScripts(),
+        },
+        devDependencies: {
+          ...((current.devDependencies as Record<string, string> | undefined) ?? {}),
+          turbo: "^2.5.0",
         },
       },
       null,
@@ -206,6 +211,7 @@ function emitPackageSkeletons(
     scope: config.scope,
     scopeName: scopeName(config.scope),
     corePackage: packageName(config.scope, "core"),
+    workspaceRange: resolvePackageManagerDriver(config.packageManager).workspaceRange,
   };
 
   copyTemplateTree(join(templatesDir(), "packages", "core"), join(targetDir, "packages", "core"), vars);
@@ -217,6 +223,8 @@ function emitPackageSkeletons(
       {
         ...vars,
         adapterPackage: packageName(config.scope, adapterId),
+        workspaceRange:
+          resolvePackageManagerDriver(config.packageManager).workspaceRange,
       },
     );
   }
@@ -252,7 +260,7 @@ export function applyWorkspacePromotion(
     writeWorkspaceRoot(targetDir, config);
     writeTurboJson(targetDir);
   } else {
-    ensureMonorepoWorkspaceFile(targetDir);
+    ensureMonorepoWorkspaceFile(targetDir, config);
     patchMonorepoRootPackage(targetDir, config);
     writeTurboJson(targetDir);
   }

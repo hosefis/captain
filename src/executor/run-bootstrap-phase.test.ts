@@ -42,7 +42,10 @@ describe("runBootstrapPhase", () => {
       return;
     }
 
-    expect(result.completedBootstrapSteps).toEqual(["bootstrap-web"]);
+    expect(result.completedBootstrapSteps).toEqual([
+      "bootstrap-web",
+      "install-root",
+    ]);
     expect(result.appliedRecipes).toContain("workspace-promote");
     expect(result.appliedRecipes).toContain("backend-rest");
     expect(result.appliedRecipes).toContain("module-authorization");

@@ -12,7 +12,7 @@
     "build": "tsc --noEmit"
   },
   "dependencies": {
-    "{corePackage}": "workspace:*"
+    "{corePackage}": "{workspaceRange}"
   },
   "devDependencies": {
     "typescript": "^5.8.2"

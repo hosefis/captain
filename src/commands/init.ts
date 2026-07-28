@@ -102,7 +102,7 @@ export type InitResult =
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
-      phase: "bootstrap" | "workspace" | "config" | "recipes";
+      phase: "bootstrap" | "workspace" | "config" | "recipes" | "install";
       message: string;
     };
 
