@@ -101,6 +101,17 @@ function pnpmBuildPolicy(config: NormalizedProjectConfig) {
     : {};
 }
 
+function pnpmWorkspaceYaml(): string {
+  return [
+    "packages:",
+    '  - "apps/*"',
+    '  - "packages/*"',
+    "onlyBuiltDependencies:",
+    ...PNPM_ONLY_BUILT_DEPENDENCIES.map((dependency) => `  - "${dependency}"`),
+    "",
+  ].join("\n");
+}
+
 function patchAppPackageName(appPath: string, packageName: string): void {
   const pkgPath = join(appPath, "package.json");
   if (!existsSync(pkgPath)) {
@@ -118,8 +129,11 @@ function writeWorkspaceRoot(
 ): void {
   const driver = resolvePackageManagerDriver(config.packageManager);
   if (driver.emitsPnpmWorkspace) {
-    const workspaceYaml = `packages:\n  - "apps/*"\n  - "packages/*"\n`;
-    writeFileSync(join(targetDir, "pnpm-workspace.yaml"), workspaceYaml, "utf-8");
+    writeFileSync(
+      join(targetDir, "pnpm-workspace.yaml"),
+      pnpmWorkspaceYaml(),
+      "utf-8",
+    );
   }
 
   const rootPackage = {
@@ -169,9 +183,16 @@ function ensureMonorepoWorkspaceFile(
   if (existsSync(workspacePath)) {
     const content = readFileSync(workspacePath, "utf-8");
     if (!content.includes("packages/*")) {
+      const updated = `${content.trim()}\n  - "packages/*"\n`;
+      writeFileSync(workspacePath, updated, "utf-8");
+    }
+    const updated = readFileSync(workspacePath, "utf-8");
+    if (!updated.includes("onlyBuiltDependencies:")) {
       writeFileSync(
         workspacePath,
-        `${content.trim()}\n  - "packages/*"\n`,
+        `${updated.trim()}\nonlyBuiltDependencies:\n${PNPM_ONLY_BUILT_DEPENDENCIES.map(
+          (dependency) => `  - "${dependency}"`,
+        ).join("\n")}\n`,
         "utf-8",
       );
     }
@@ -180,7 +201,7 @@ function ensureMonorepoWorkspaceFile(
 
   writeFileSync(
     workspacePath,
-    `packages:\n  - "apps/*"\n  - "packages/*"\n`,
+    pnpmWorkspaceYaml(),
     "utf-8",
   );
 }
