@@ -1,58 +1,74 @@
 # create-captain
 
-> *"With great scaffolding comes great maintainability."*  
-> — probably Uncle Ben, if he shipped B2B2C SaaS
+> *"With great scaffolding comes great maintainability."*
 
-**CAPTAIN** — **C**reate **A**pps **P**roperly: **T**emplates, **A**dapters, **I**ntegrations, **N**ow.
+CAPTAIN — **C**reate **A**pps **P**roperly: **T**emplates, **A**dapters,
+**I**ntegrations, **N**ow — generates owned Next.js, Expo, and Turborepo
+projects. Generated applications do not depend on the CAPTAIN CLI at runtime.
 
-Scaffolds **Next.js**, **Expo**, and **Turborepo** monorepos with composable auth, i18n, UI, backend, and deep modules. Generated code is fully owned by your project — copy-out recipes, no runtime CLI dependency.
-
-> **Not** [create-captain-app](https://www.npmjs.com/package/create-captain-app) — that package scaffolds Electron apps. Always invoke CAPTAIN via `create-captain`.
+This is not
+[`create-captain-app`](https://www.npmjs.com/package/create-captain-app), which
+targets Electron. Invoke this generator as `create-captain`.
 
 ## Requirements
 
-- Node.js **22+** (see `.nvmrc`)
+- Node.js 22 or newer
+- pnpm, npm, or Bun when selecting that package manager
+- A Clerk application for generated authentication credentials
 
-## Usage
+## Quick start
 
-```bash
-# Interactive wizard (human mode)
-pnpm dlx create-captain@latest
-
-# Agent mode — no prompts
-pnpm dlx create-captain@latest --config ./project.json --yes
-
-# Preview plan without writing files
-pnpm dlx create-captain@latest --config ./project.json --dry-run --json
-```
-
-### Commands
-
-| Command | Description |
-|---------|-------------|
-| `init [directory]` | Scaffold a new project (default: current directory) |
-| `add-module <module>` | Add an optional module to an existing project |
-| `scaffold:catalog <resource>` | Generate an admin catalog resource |
-| `migrate:to-monorepo` | Hoist a standalone app into a Turborepo monorepo |
+Bare invocation and explicit `init` are equivalent:
 
 ```bash
-pnpm dlx create-captain add-module admin-catalog
-pnpm dlx create-captain scaffold:catalog billing-types \
-  --fields name:string,description:string --archive
-pnpm dlx create-captain migrate:to-monorepo --add mobile
+pnpm dlx create-captain@latest my-app
+pnpm dlx create-captain@latest init my-app
+
+npx create-captain@latest my-app
+bunx create-captain@latest my-app
 ```
 
-### Global flags
+Without `--config`, CAPTAIN opens the interactive wizard. For repeatable agent
+or CI runs, pass a configuration file:
 
-| Flag | Purpose |
-|------|---------|
-| `--config <path>` | Agent input: path to `project.json` (skips wizard) |
-| `--yes` | Accept defaults and skip confirmations |
-| `--dry-run` | Print execution plan without making changes |
-| `--json` | Emit machine-readable output |
-| `--verify-docs` | Report npm-latest vs bundled recipe version drift |
+```bash
+create-captain my-app --config ./project.json --yes
+create-captain my-app --config ./project.json --dry-run --json
+```
 
-## `project.json` (agent mode)
+`--dry-run` performs schema and compatibility validation and returns the
+complete planned bootstrap, recipe, and smoke steps without writing. JSON mode
+uses a status envelope such as `dry_run`, `success`, `blocked`,
+`execution_failed`, or `smoke_failed` and exits non-zero for failures.
+
+## Commands
+
+| Command | Purpose | Command options |
+| --- | --- | --- |
+| `[init] [directory]` | Generate a web, mobile, or monorepo project | Uses `--config` or the wizard |
+| `add-module <module>` | Add `admin-catalog`, `form-wizard`, or `user-identity` | `--project <path>` |
+| `scaffold:catalog <resource>` | Generate typed catalog config, routes, server wiring, and locale files | `--fields <list>`, `--archive`, `--project <path>` |
+| `migrate:to-monorepo` | Convert a standalone project while preserving existing apps and packages | `--add web\|mobile`, `--project <path>` |
+
+```bash
+create-captain add-module form-wizard
+create-captain scaffold:catalog billing-types \
+  --fields name:string,description:string,active:boolean --archive
+create-captain migrate:to-monorepo --add mobile
+```
+
+Global execution flags apply consistently:
+
+| Flag | Behavior |
+| --- | --- |
+| `--config <path>` | Read init configuration from JSON |
+| `--yes` | Skip warning confirmations |
+| `--dry-run` | Validate and serialize the operation without applying it |
+| `--json` | Emit machine-readable status output |
+| `--force` | Authorize only the replacements listed by preflight |
+| `--verify-docs` | Compare bundled dependency ranges with npm metadata |
+
+## Project configuration
 
 ```json
 {
@@ -71,40 +87,90 @@ pnpm dlx create-captain migrate:to-monorepo --add mobile
     "web": "shadcn-base-ui",
     "mobile": "nativewind"
   },
-  "modules": ["authorization"],
+  "modules": [
+    "authorization",
+    "admin-catalog",
+    "form-wizard",
+    "user-identity"
+  ],
+  "runtime": "dev-build",
   "locales": ["en", "fr"],
   "defaultLocale": "en",
   "validation": "strict"
 }
 ```
 
-Full schema and compatibility rules are defined in [`SPEC.md`](SPEC.md).
+See [`SPEC.md`](SPEC.md) for the schema and compatibility rules and
+[`docs/glossary.md`](docs/glossary.md) for domain terminology. Legacy
+configuration containing `payment` is rejected with a link to the standalone
+[future payment release specification](docs/specs/payment-release.md).
 
-## What works today (v0.1)
+## Supported release surface
 
-**CLI shell** — commander entry, global flags, command registration. Subcommands other than `init` are stubs that exit with a message.
+| Capability | Supported |
+| --- | --- |
+| Topology | Next.js web, Expo mobile dev-build, web/mobile Turborepo |
+| Package manager | pnpm, npm, Bun |
+| Backend | REST adapter |
+| Authentication | Clerk |
+| Internationalization | GT Next, GT React Native, Expo Localization |
+| UI | shadcn/Base UI, NativeWind |
+| Modules | Authorization, AdminCatalog, FormWizard, User Identity |
+| Follow-up generation | Optional modules, catalog resources, monorepo migration |
 
-| Tier | Status |
-|------|--------|
-| **Tier A** (default web/mobile/monorepo + rest + clerk + gt-* + shadcn/nativewind) | Planned — bootstrap and recipes in progress |
-| **Tier B** (convex/supabase/firebase, non-default auth/i18n/ui, desktop) | Blocked until recipes land |
+Convex, Supabase, Firebase, Better Auth, WorkOS, next-intl, Radix-based shadcn,
+React Native Paper, Expo Go, desktop, and payment remain explicit compatibility
+blocks. The authoritative boundary is
+[ADR 0001](docs/adr/0001-tier-a-release-scope.md).
 
-Payment is deferred to a [separate future release](docs/specs/payment-release.md).
+## Workspace and package-manager behavior
 
-See the [implementation plan](.cursor/plans/bootstrap_create-captain_05e9ac88.plan.md) for milestone status.
+All generated projects declare `package.json` workspaces and Turbo-backed root
+`dev`, `build`, `lint`, and `typecheck` tasks. CAPTAIN finalizes every manifest
+before running one root install.
 
-## Development
+| Manager | Workspace range | Manager-specific metadata |
+| --- | --- | --- |
+| pnpm | `workspace:*` | Emits `pnpm-workspace.yaml` and `pnpm-lock.yaml` |
+| npm | `*` | Uses package workspaces and `package-lock.json` |
+| Bun | `workspace:*` | Uses package workspaces and `bun.lock` |
+
+Smoke validation invokes scripts through the selected package manager, so no
+generated command relies on POSIX-only environment assignment.
+
+## Collision policy
+
+Commands preflight their intended targets before CAPTAIN writes generated
+files. An unsafe existing path aborts the operation and identifies the
+collision. `--force` permits only the replacements already present in that
+plan; it does not add new targets. Dry runs never write.
+
+`add-module` preserves unrelated modules and refuses to replace an edited core
+export index unless forced. Catalog scaffolding refuses duplicate resources.
+Monorepo migration preserves existing app source and applies integration
+recipes only to a newly requested app. Keep application code in source control
+and review every forced plan before applying it.
+
+## Development and release validation
 
 ```bash
 pnpm install
-pnpm build          # bundle src/cli.ts → dist/cli.js
 pnpm typecheck
+pnpm lint
 pnpm test
-
-# Run locally
-node dist/cli.js --help
+pnpm test:matrix
+pnpm build
 ```
+
+Pull requests run the generator checks, a deterministic pnpm/npm/Bun ×
+web/mobile/monorepo fixture matrix, and a live pnpm/web canary. Nightly and
+release-triggered workflows exercise the complete live 3×3 matrix and retain
+the generated project when a case fails.
+
+When changing a recipe, update its generated-file contract test and dependency
+range together. Architecture, generated-file ownership, version policy, and CI
+policy are recorded in [`docs/adr`](docs/adr).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [`LICENSE`](LICENSE).

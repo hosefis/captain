@@ -1,0 +1,13 @@
+{
+  "name": "acme-web-bun",
+  "scope": "@acme",
+  "packageManager": "bun",
+  "topology": "web",
+  "backend": "rest",
+  "auth": "clerk",
+  "i18n": "gt-next",
+  "ui": "shadcn-base-ui",
+  "modules": ["authorization"],
+  "locales": ["en", "fr"],
+  "defaultLocale": "en"
+}
