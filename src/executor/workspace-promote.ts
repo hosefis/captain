@@ -143,6 +143,7 @@ function writeWorkspaceRoot(
   const rootPackage = {
     name: config.name,
     private: true,
+    packageManager: driver.manifestId,
     workspaces: ["apps/*", "packages/*"],
     scripts: workspaceScripts(),
     devDependencies: {
@@ -236,6 +237,8 @@ function patchMonorepoRootPackage(
         ...current,
         name: config.name,
         private: true,
+        packageManager:
+          resolvePackageManagerDriver(config.packageManager).manifestId,
         workspaces: ["apps/*", "packages/*"],
         scripts: {
           ...((current.scripts as Record<string, string> | undefined) ?? {}),

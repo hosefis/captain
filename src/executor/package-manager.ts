@@ -11,6 +11,7 @@ export type PackageManagerDriver = {
   lockfile: string;
   workspaceRange: string;
   emitsPnpmWorkspace: boolean;
+  manifestId: string;
   runScript(script: string): PackageManagerCommand;
 };
 
@@ -21,6 +22,7 @@ const DRIVERS: Record<PackageManager, PackageManagerDriver> = {
     lockfile: "pnpm-lock.yaml",
     workspaceRange: "workspace:*",
     emitsPnpmWorkspace: true,
+    manifestId: "pnpm@9.15.9",
     runScript: (script) => ({ command: "pnpm", args: ["run", script] }),
   },
   npm: {
@@ -29,6 +31,7 @@ const DRIVERS: Record<PackageManager, PackageManagerDriver> = {
     lockfile: "package-lock.json",
     workspaceRange: "*",
     emitsPnpmWorkspace: false,
+    manifestId: "npm@10.9.2",
     runScript: (script) => ({ command: "npm", args: ["run", script] }),
   },
   bun: {
@@ -37,6 +40,7 @@ const DRIVERS: Record<PackageManager, PackageManagerDriver> = {
     lockfile: "bun.lock",
     workspaceRange: "workspace:*",
     emitsPnpmWorkspace: false,
+    manifestId: "bun@1.2.5",
     runScript: (script) => ({ command: "bun", args: ["run", script] }),
   },
 };

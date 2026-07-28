@@ -45,9 +45,13 @@ describe("applyWorkspacePromotion", () => {
       ) as {
         workspaces: string[];
         scripts: Record<string, string>;
+        packageManager: string;
         pnpm?: { onlyBuiltDependencies?: string[] };
       };
       expect(root.workspaces).toEqual(["apps/*", "packages/*"]);
+      expect(root.packageManager).toMatch(
+        new RegExp(`^${packageManager}@`),
+      );
       expect(root.scripts.build).toBe("turbo build");
       expect(existsSync(join(targetDir, "pnpm-workspace.yaml"))).toBe(
         packageManager === "pnpm",
