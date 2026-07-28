@@ -498,7 +498,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
 
 export function registerInitCommand(program: Command): void {
   program
-    .command("init")
+    .command("init", { isDefault: true })
     .description("Scaffold a new CAPTAIN project")
     .argument("[directory]", "Target directory", ".")
     .action(async (directory: string, _options: unknown, command: Command) => {

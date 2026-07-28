@@ -12,24 +12,28 @@ const packageJson = JSON.parse(
   readFileSync(join(__dirname, "../package.json"), "utf8"),
 ) as { version: string };
 
-const program = new Command()
-  .name("captain")
-  .description(
-    "CAPTAIN — Create Apps Properly: Templates, Adapters, Integrations, Now",
-  )
-  .version(packageJson.version)
-  .option("--config <path>", "Agent input: path to project.json")
-  .option("--yes", "Accept defaults and skip confirmations")
-  .option("--dry-run", "Print execution plan without making changes")
-  .option("--json", "Emit machine-readable output")
-  .option(
-    "--verify-docs",
-    "Report npm-latest vs bundled recipe version drift",
-  );
+export function createProgram(): Command {
+  const program = new Command()
+    .name("captain")
+    .description(
+      "CAPTAIN — Create Apps Properly: Templates, Adapters, Integrations, Now",
+    )
+    .version(packageJson.version)
+    .option("--config <path>", "Agent input: path to project.json")
+    .option("--yes", "Accept defaults and skip confirmations")
+    .option("--dry-run", "Print execution plan without making changes")
+    .option("--json", "Emit machine-readable output")
+    .option("--force", "Allow preflighted generated-file replacements")
+    .option(
+      "--verify-docs",
+      "Report npm-latest vs bundled recipe version drift",
+    );
 
-registerInitCommand(program);
-registerAddModuleCommand(program);
-registerScaffoldCatalogCommand(program);
-registerMigrateToMonorepoCommand(program);
+  registerInitCommand(program);
+  registerAddModuleCommand(program);
+  registerScaffoldCatalogCommand(program);
+  registerMigrateToMonorepoCommand(program);
+  return program;
+}
 
-program.parse();
+createProgram().parse();

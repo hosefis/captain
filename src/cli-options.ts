@@ -6,6 +6,7 @@ export interface GlobalCliOptions {
   dryRun?: boolean;
   json?: boolean;
   verifyDocs?: boolean;
+  force?: boolean;
 }
 
 export function getGlobalOptions(command: Command): GlobalCliOptions {
@@ -15,6 +16,7 @@ export function getGlobalOptions(command: Command): GlobalCliOptions {
     dryRun?: boolean;
     json?: boolean;
     verifyDocs?: boolean;
+    force?: boolean;
   };
 
   return {
@@ -23,6 +25,7 @@ export function getGlobalOptions(command: Command): GlobalCliOptions {
     dryRun: opts.dryRun ?? false,
     json: opts.json ?? false,
     verifyDocs: opts.verifyDocs ?? false,
+    force: opts.force ?? false,
   };
 }
 
