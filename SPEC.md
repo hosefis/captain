@@ -241,6 +241,11 @@ When **payment is selected**, always emit **PaymentCheckout + webhook stub + `.e
 
 ## 8. PaymentCheckout module
 
+> **Deferred from the Tier A release.** Payment is not part of the current
+> executable configuration or recipe surface. Its preserved design and future
+> release criteria live in
+> [`docs/specs/payment-release.md`](docs/specs/payment-release.md).
+
 ### 8.1 Interface
 
 ```ts
