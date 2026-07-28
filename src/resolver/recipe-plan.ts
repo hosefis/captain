@@ -11,7 +11,9 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     {
       id: "workspace-promote",
       phase: "workspace",
-      description: "Promote to mini-monorepo: pnpm-workspace.yaml, packages/core, packages/adapters-*",
+      description: `Promote to workspace: package.json workspaces${
+        config.packageManager === "pnpm" ? ", pnpm-workspace.yaml" : ""
+      }, packages/core, packages/adapters-*`,
     },
     {
       id: "context-md",

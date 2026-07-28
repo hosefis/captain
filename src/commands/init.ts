@@ -377,7 +377,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
 
   if (result.status === "dry_run") {
     const payload = {
-      status: "dry-run",
+      status: "dry_run",
       config: result.config,
       compatibility: result.compatibility,
       plan: result.plan,
