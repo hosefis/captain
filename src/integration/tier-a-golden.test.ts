@@ -1,0 +1,100 @@
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { describe, expect, it } from "vitest";
+import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
+import { normalizeProjectConfig, parseProjectConfig, type ProjectConfig } from "../schema/project-config.js";
+import { resolveSmokeSteps, runSmokeValidation } from "../validators/smoke.js";
+
+function tierABase(overrides: Partial<ProjectConfig>): ProjectConfig {
+  return {
+    name: "acme-platform",
+    scope: "@acme",
+    packageManager: "pnpm",
+    topology: "web",
+    backend: "rest",
+    auth: "clerk",
+    i18n: "gt-next",
+    ui: "shadcn-base-ui",
+    modules: ["authorization"],
+    locales: ["en", "fr"],
+    defaultLocale: "en",
+    validation: "strict",
+    ...overrides,
+  };
+}
+
+const tierAFixtures = [
+  {
+    id: "web",
+    config: normalizeProjectConfig(parseProjectConfig(tierABase({ topology: "web" }))),
+  },
+  {
+    id: "mobile",
+    config: normalizeProjectConfig(
+      parseProjectConfig(
+        tierABase({
+          topology: "mobile",
+          runtime: "dev-build",
+          i18n: "gt-react-native",
+          ui: "nativewind",
+        }),
+      ),
+    ),
+  },
+  {
+    id: "monorepo",
+    config: normalizeProjectConfig(
+      parseProjectConfig(
+        tierABase({
+          topology: "monorepo",
+          apps: ["web", "mobile"],
+          runtime: "dev-build",
+          i18n: { web: "gt-next", mobile: "gt-react-native" },
+          ui: { web: "shadcn-base-ui", mobile: "nativewind" },
+        }),
+      ),
+    ),
+  },
+] as const;
+
+function makeTempDir(label: string): string {
+  const dir = join(
+    tmpdir(),
+    `captain-tier-a-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+describe("Tier A golden fixtures (pre-publish matrix)", () => {
+  for (const fixture of tierAFixtures) {
+    it(`scaffolds ${fixture.id} and passes agent smoke plan`, async () => {
+      const directory = makeTempDir(fixture.id);
+
+      const bootstrap = await runBootstrapPhase(fixture.config, directory, {
+        bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+        simulateBootstrapOutput: true,
+      });
+
+      expect(bootstrap.ok).toBe(true);
+      if (!bootstrap.ok) {
+        return;
+      }
+
+      const smokeSteps = resolveSmokeSteps(fixture.config, true);
+      expect(smokeSteps).toEqual(["typecheck", "lint", "build"]);
+
+      const smoke = await runSmokeValidation(directory, smokeSteps, {
+        packageManager: fixture.config.packageManager,
+        runner: async (step, command, args) => {
+          expect(command).toBe("pnpm");
+          expect(args).toEqual(["run", step]);
+          return { exitCode: 0, stdout: "", stderr: "" };
+        },
+      });
+
+      expect(smoke.ok).toBe(true);
+    });
+  }
+});

@@ -31,12 +31,84 @@ export type RunBootstrapPhaseOptions = {
   simulateBootstrapOutput?: boolean;
 };
 
-function simulateWebBootstrap(targetDirectory: string): void {
+function appBootstrapScripts(kind: "web" | "mobile"): Record<string, string> {
+  if (kind === "web") {
+    return { dev: "next dev", build: "next build", lint: "eslint .", typecheck: "tsc --noEmit" };
+  }
+
+  return {
+    start: "expo start",
+    build: "expo export",
+    lint: "eslint .",
+    typecheck: "tsc --noEmit",
+  };
+}
+
+function writeAppBootstrap(targetDirectory: string, kind: "web" | "mobile"): void {
   writeFileSync(
     join(targetDirectory, "package.json"),
-    JSON.stringify({ name: "temp-next", scripts: { dev: "next dev", build: "next build", lint: "eslint ." } }),
+    `${JSON.stringify({ name: `temp-${kind}`, scripts: appBootstrapScripts(kind) }, null, 2)}\n`,
   );
-  writeFileSync(join(targetDirectory, "next.config.ts"), "export default {};\n");
+
+  if (kind === "web") {
+    writeFileSync(join(targetDirectory, "next.config.ts"), "export default {};\n");
+    return;
+  }
+
+  writeFileSync(
+    join(targetDirectory, "app.json"),
+    `${JSON.stringify({ expo: { name: "temp-expo" } }, null, 2)}\n`,
+  );
+}
+
+function simulateWebBootstrap(targetDirectory: string): void {
+  writeAppBootstrap(targetDirectory, "web");
+}
+
+function simulateMobileBootstrap(targetDirectory: string): void {
+  writeAppBootstrap(targetDirectory, "mobile");
+}
+
+function simulateMonorepoBootstrap(
+  targetDirectory: string,
+  config: NormalizedProjectConfig,
+): void {
+  writeFileSync(
+    join(targetDirectory, "package.json"),
+    `${JSON.stringify({ name: "temp-turbo", private: true }, null, 2)}\n`,
+  );
+  writeFileSync(
+    join(targetDirectory, "pnpm-workspace.yaml"),
+    'packages:\n  - "apps/*"\n',
+    "utf-8",
+  );
+
+  if (config.stacks.hasWeb) {
+    mkdirSync(join(targetDirectory, "apps", "web"), { recursive: true });
+    writeAppBootstrap(join(targetDirectory, "apps", "web"), "web");
+  }
+
+  if (config.stacks.hasMobile) {
+    mkdirSync(join(targetDirectory, "apps", "mobile"), { recursive: true });
+    writeAppBootstrap(join(targetDirectory, "apps", "mobile"), "mobile");
+  }
+}
+
+function simulateBootstrapOutput(
+  config: NormalizedProjectConfig,
+  targetDirectory: string,
+): void {
+  if (config.topology === "web") {
+    simulateWebBootstrap(targetDirectory);
+    return;
+  }
+
+  if (config.topology === "mobile") {
+    simulateMobileBootstrap(targetDirectory);
+    return;
+  }
+
+  simulateMonorepoBootstrap(targetDirectory, config);
 }
 
 export async function runBootstrapPhase(
@@ -61,8 +133,8 @@ export async function runBootstrapPhase(
     };
   }
 
-  if (options.simulateBootstrapOutput && config.topology === "web") {
-    simulateWebBootstrap(targetDirectory);
+  if (options.simulateBootstrapOutput) {
+    simulateBootstrapOutput(config, targetDirectory);
   }
 
   try {

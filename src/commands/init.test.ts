@@ -1,8 +1,19 @@
+import { mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildInitPlan, runInit } from "./init.js";
 
 const fixturesDir = join(import.meta.dirname, "../../fixtures");
+
+function makeTempDir(label: string): string {
+  const directory = join(
+    tmpdir(),
+    `captain-init-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(directory, { recursive: true });
+  return directory;
+}
 
 describe("runInit", () => {
   it("returns dry-run plan for Tier A web config", async () => {
@@ -113,6 +124,57 @@ describe("runInit", () => {
     expect(result.verifyDocs.blocks.some((block) => block.package === "create-next-app")).toBe(
       true,
     );
+  });
+
+  it("returns successful completed smoke details", async () => {
+    const result = await runInit({
+      directory: makeTempDir("success"),
+      config: join(fixturesDir, "project-web.json"),
+      yes: true,
+      dryRun: false,
+      json: true,
+      verifyDocs: false,
+      bootstrapOptions: {
+        bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+        simulateBootstrapOutput: true,
+      },
+      smokeRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+    });
+
+    expect(result.status).toBe("success");
+    if (result.status === "success") {
+      expect(result.smoke).toEqual({
+        ok: true,
+        steps: ["typecheck", "lint", "build"],
+        completedSteps: ["typecheck", "lint", "build"],
+      });
+    }
+  });
+
+  it("returns the failed smoke step and completed predecessors", async () => {
+    const result = await runInit({
+      directory: makeTempDir("smoke-failure"),
+      config: join(fixturesDir, "project-web.json"),
+      yes: true,
+      dryRun: false,
+      json: true,
+      verifyDocs: false,
+      bootstrapOptions: {
+        bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+        simulateBootstrapOutput: true,
+      },
+      smokeRunner: async (step) => ({
+        exitCode: step === "lint" ? 1 : 0,
+        stdout: "",
+        stderr: step === "lint" ? "lint failed" : "",
+      }),
+    });
+
+    expect(result.status).toBe("smoke_failed");
+    if (result.status === "smoke_failed") {
+      expect(result.smoke.failedStep).toBe("lint");
+      expect(result.smoke.completedSteps).toEqual(["typecheck"]);
+    }
   });
 });
 

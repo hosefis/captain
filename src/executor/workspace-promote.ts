@@ -94,6 +94,7 @@ function workspaceScripts(config: NormalizedProjectConfig): Record<string, strin
 
   return {
     dev: "pnpm --dir apps/mobile start",
+    build: "pnpm --dir apps/mobile build",
     lint: "pnpm -r lint",
     typecheck: "pnpm -r typecheck",
   };
@@ -169,6 +170,34 @@ function ensureMonorepoWorkspaceFile(targetDir: string): void {
   );
 }
 
+function patchMonorepoRootPackage(
+  targetDir: string,
+  config: NormalizedProjectConfig,
+): void {
+  const packagePath = join(targetDir, "package.json");
+  const current = existsSync(packagePath)
+    ? (JSON.parse(readFileSync(packagePath, "utf-8")) as Record<string, unknown>)
+    : {};
+
+  writeFileSync(
+    packagePath,
+    `${JSON.stringify(
+      {
+        ...current,
+        name: config.name,
+        private: true,
+        scripts: {
+          ...((current.scripts as Record<string, string> | undefined) ?? {}),
+          ...workspaceScripts(config),
+        },
+      },
+      null,
+      2,
+    )}\n`,
+    "utf-8",
+  );
+}
+
 function emitPackageSkeletons(
   targetDir: string,
   config: NormalizedProjectConfig,
@@ -224,6 +253,8 @@ export function applyWorkspacePromotion(
     writeTurboJson(targetDir);
   } else {
     ensureMonorepoWorkspaceFile(targetDir);
+    patchMonorepoRootPackage(targetDir, config);
+    writeTurboJson(targetDir);
   }
 
   emitPackageSkeletons(targetDir, config);

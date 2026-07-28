@@ -2,6 +2,7 @@ import { resolve } from "node:path";
 import * as p from "@clack/prompts";
 import type { GlobalCliOptions } from "../cli-options.js";
 import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
+import type { RunBootstrapPhaseOptions } from "../executor/run-bootstrap-phase.js";
 import { runWizard } from "../prompts/wizard.js";
 import {
   formatBootstrapCommand,
@@ -28,6 +29,13 @@ import {
   type NpmFetch,
   type VerifyDocsResult,
 } from "../validators/verify-docs.js";
+import {
+  formatSmokeFailure,
+  runSmokeValidation,
+  type SmokeRunner,
+  type SmokeRunResult,
+  type SmokeStep,
+} from "../validators/smoke.js";
 
 export type InitPlan = {
   phase1: {
@@ -74,6 +82,18 @@ export type InitResult =
       directory: string;
       completedBootstrapSteps: string[];
       appliedRecipes: string[];
+      smoke: SmokeRunResult;
+      verifyDocs?: VerifyDocsResult;
+    }
+  | {
+      status: "smoke_failed";
+      config: NormalizedProjectConfig;
+      compatibility: CompatibilityResult;
+      plan: InitPlan;
+      directory: string;
+      completedBootstrapSteps: string[];
+      appliedRecipes: string[];
+      smoke: Extract<SmokeRunResult, { ok: false }>;
       verifyDocs?: VerifyDocsResult;
     }
   | {
@@ -90,6 +110,12 @@ export type InitOptions = GlobalCliOptions & {
   directory: string;
   /** Test hook: mock npm registry lookups for --verify-docs */
   npmFetch?: NpmFetch;
+  /** Test hook: mock Phase 3 smoke runner */
+  smokeRunner?: SmokeRunner;
+  /** Test hook: skip Phase 3 smoke (bootstrap/recipe integration tests) */
+  skipSmoke?: boolean;
+  /** Test hook: inject bootstrap execution without network access. */
+  bootstrapOptions?: RunBootstrapPhaseOptions;
 };
 
 function isAgentMode(options: InitOptions): boolean {
@@ -219,7 +245,11 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { status: "dry_run", config, compatibility, plan, verifyDocs };
   }
 
-  const execution = await runBootstrapPhase(config, directory);
+  const execution = await runBootstrapPhase(
+    config,
+    directory,
+    options.bootstrapOptions,
+  );
 
   if (!execution.ok) {
     return {
@@ -233,6 +263,40 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     };
   }
 
+  if (options.skipSmoke) {
+    const skippedSteps = plan.phase3.smoke as SmokeStep[];
+    return {
+      status: "success",
+      config,
+      compatibility,
+      plan,
+      directory,
+      completedBootstrapSteps: execution.completedBootstrapSteps,
+      appliedRecipes: execution.appliedRecipes,
+      smoke: { ok: true, steps: skippedSteps, completedSteps: skippedSteps },
+      verifyDocs,
+    };
+  }
+
+  const smoke = await runSmokeValidation(directory, plan.phase3.smoke as SmokeStep[], {
+    packageManager: config.packageManager,
+    runner: options.smokeRunner,
+  });
+
+  if (!smoke.ok) {
+    return {
+      status: "smoke_failed",
+      config,
+      compatibility,
+      plan,
+      directory,
+      completedBootstrapSteps: execution.completedBootstrapSteps,
+      appliedRecipes: execution.appliedRecipes,
+      smoke,
+      verifyDocs,
+    };
+  }
+
   return {
     status: "success",
     config,
@@ -241,6 +305,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     directory,
     completedBootstrapSteps: execution.completedBootstrapSteps,
     appliedRecipes: execution.appliedRecipes,
+    smoke,
     verifyDocs,
   };
 }
@@ -336,6 +401,24 @@ function handleInitResult(result: InitResult, json: boolean): never {
     process.exit(0);
   }
 
+  if (result.status === "smoke_failed") {
+    const payload = {
+      status: "smoke_failed",
+      directory: result.directory,
+      config: result.config,
+      completedBootstrapSteps: result.completedBootstrapSteps,
+      appliedRecipes: result.appliedRecipes,
+      smoke: result.smoke,
+    };
+
+    if (json) {
+      console.log(JSON.stringify(payload, null, 2));
+    } else {
+      console.error(formatSmokeFailure(result.smoke));
+    }
+    process.exit(1);
+  }
+
   if (result.status === "success") {
     const payload = {
       status: "success",
@@ -346,7 +429,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
       pendingRecipes: result.plan.phase2.recipes.filter(
         (step) => !result.appliedRecipes.includes(step.id),
       ),
-      smoke: result.plan.phase3.smoke,
+      smoke: result.smoke,
       verifyDocs: result.verifyDocs,
     };
 
@@ -373,7 +456,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
           console.log(`  • [${step.phase}] ${step.description}`);
         }
       }
-      console.log(`\nNext: Phase 3 smoke — ${result.plan.phase3.smoke.join(" → ")}`);
+      console.log(`\nSmoke complete: ${result.smoke.completedSteps.join(" → ")}`);
     }
     process.exit(0);
   }
