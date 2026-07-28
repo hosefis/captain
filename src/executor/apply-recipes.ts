@@ -6,6 +6,7 @@ import { resolveRecipePlan, type RecipeStep } from "../resolver/recipe-plan.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 import { mergePackageJson } from "./package-json.js";
 import { buildRecipeVars, type RecipeVars } from "./recipe-vars.js";
+import { testedRange } from "./tested-versions.js";
 
 export type ApplyRecipesResult =
   | { ok: true; appliedRecipes: string[] }
@@ -98,14 +99,29 @@ function applyAuthClerk(targetDir: string, config: NormalizedProjectConfig, vars
       join(adapterDir(targetDir, "adapters-next"), "src", "auth", "clerk.ts"),
       vars,
     );
+    renderModuleFile(
+      "scaffold/clerk-next-middleware.ts",
+      join(appDir(targetDir, "web"), "middleware.ts"),
+      vars,
+    );
+    renderModuleFile(
+      "scaffold/clerk-next-provider.tsx",
+      join(appDir(targetDir, "web"), "app", "captain-auth-provider.tsx"),
+      vars,
+    );
+    renderModuleFile(
+      "scaffold/captain-next-layout.tsx",
+      join(appDir(targetDir, "web"), "app", "layout.tsx"),
+      vars,
+    );
     mergePackageJson(join(adapterDir(targetDir, "adapters-next"), "package.json"), {
       dependencies: {
-        "@clerk/nextjs": "latest",
+        "@clerk/nextjs": testedRange("@clerk/nextjs"),
       },
     });
     mergeAppPackageJson(targetDir, "web", {
       dependencies: {
-        "@clerk/nextjs": "latest",
+        "@clerk/nextjs": testedRange("@clerk/nextjs"),
       },
     });
   }
@@ -117,16 +133,26 @@ function applyAuthClerk(targetDir: string, config: NormalizedProjectConfig, vars
       join(adapterDir(targetDir, "adapters-expo"), "src", "auth", "clerk.ts"),
       vars,
     );
+    renderModuleFile(
+      "scaffold/clerk-expo-provider.tsx",
+      join(appDir(targetDir, "mobile"), "captain-auth-provider.tsx"),
+      vars,
+    );
+    renderModuleFile(
+      "scaffold/captain-expo-app.tsx",
+      join(appDir(targetDir, "mobile"), "App.tsx"),
+      vars,
+    );
     mergePackageJson(join(adapterDir(targetDir, "adapters-expo"), "package.json"), {
       dependencies: {
-        "@clerk/expo": "latest",
-        "expo-secure-store": "latest",
+        "@clerk/expo": testedRange("@clerk/expo"),
+        "expo-secure-store": testedRange("expo-secure-store"),
       },
     });
     mergeAppPackageJson(targetDir, "mobile", {
       dependencies: {
-        "@clerk/expo": "latest",
-        "expo-secure-store": "latest",
+        "@clerk/expo": testedRange("@clerk/expo"),
+        "expo-secure-store": testedRange("expo-secure-store"),
       },
     });
   }
@@ -141,15 +167,15 @@ function applyI18nWebGtNext(targetDir: string, vars: RecipeVars): void {
   );
   mergePackageJson(join(adapterDir(targetDir, "adapters-next"), "package.json"), {
     dependencies: {
-      "gt-next": "latest",
+      "gt-next": testedRange("gt-next"),
     },
   });
   mergeAppPackageJson(targetDir, "web", {
     dependencies: {
-      "gt-next": "latest",
+      "gt-next": testedRange("gt-next"),
     },
     devDependencies: {
-      "gtx-cli": "latest",
+      "gtx-cli": testedRange("gtx-cli"),
     },
     scripts: {
       "i18n:extract": "gtx-cli extract",
@@ -166,12 +192,12 @@ function applyI18nMobileGtReactNative(targetDir: string, vars: RecipeVars): void
   );
   mergePackageJson(join(adapterDir(targetDir, "adapters-expo"), "package.json"), {
     dependencies: {
-      "gt-react-native": "latest",
+      "gt-react-native": testedRange("gt-react-native"),
     },
   });
   mergeAppPackageJson(targetDir, "mobile", {
     dependencies: {
-      "gt-react-native": "latest",
+      "gt-react-native": testedRange("gt-react-native"),
     },
   });
 }
@@ -188,7 +214,7 @@ function applyI18nEnforcement(targetDir: string, config: NormalizedProjectConfig
   );
 
   const i18nCheckScript =
-    `CAPTAIN_LOCALES=${config.locales.join(",")} CAPTAIN_DEFAULT_LOCALE=${config.defaultLocale} node tools/i18n/i18n-check.mjs`;
+    `node tools/i18n/i18n-check.mjs --locales ${config.locales.join(",")} --default-locale ${config.defaultLocale}`;
 
   mergePackageJson(join(targetDir, "package.json"), {
     scripts: {
@@ -200,12 +226,12 @@ function applyI18nEnforcement(targetDir: string, config: NormalizedProjectConfig
 function applyExpoLocalization(targetDir: string): void {
   mergeAppPackageJson(targetDir, "mobile", {
     dependencies: {
-      "expo-localization": "latest",
+      "expo-localization": testedRange("expo-localization"),
     },
   });
   mergePackageJson(join(adapterDir(targetDir, "adapters-expo"), "package.json"), {
     dependencies: {
-      "expo-localization": "latest",
+      "expo-localization": testedRange("expo-localization"),
     },
   });
 }
@@ -217,9 +243,14 @@ function applyUiWebShadcnBaseUi(targetDir: string, vars: RecipeVars): void {
     join(adapterDir(targetDir, "adapters-next"), "src", "ui", "shadcn.ts"),
     vars,
   );
+  renderModuleFile(
+    "scaffold/shadcn-components.json",
+    join(appDir(targetDir, "web"), "components.json"),
+    vars,
+  );
   mergeAppPackageJson(targetDir, "web", {
     devDependencies: {
-      shadcn: "latest",
+      shadcn: testedRange("shadcn"),
     },
     scripts: {
       "ui:init": "npx shadcn@latest create --style base-vega --yes",
@@ -234,12 +265,27 @@ function applyUiMobileNativewind(targetDir: string, vars: RecipeVars): void {
     join(adapterDir(targetDir, "adapters-expo"), "src", "ui", "nativewind.ts"),
     vars,
   );
+  renderModuleFile(
+    "scaffold/nativewind-metro.js",
+    join(appDir(targetDir, "mobile"), "metro.config.js"),
+    vars,
+  );
+  renderModuleFile(
+    "scaffold/nativewind-global.css",
+    join(appDir(targetDir, "mobile"), "global.css"),
+    vars,
+  );
+  renderModuleFile(
+    "scaffold/nativewind-env.d.ts",
+    join(appDir(targetDir, "mobile"), "nativewind-env.d.ts"),
+    vars,
+  );
   mergeAppPackageJson(targetDir, "mobile", {
     dependencies: {
-      nativewind: "latest",
+      nativewind: testedRange("nativewind"),
     },
     devDependencies: {
-      tailwindcss: "latest",
+      tailwindcss: testedRange("tailwindcss"),
     },
   });
 }

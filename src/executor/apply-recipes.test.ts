@@ -75,11 +75,32 @@ describe("applyRecipes", () => {
     expect(adapterIndex).toContain("shadcnBaseUiConfig");
 
     expect(existsSync(join(targetDir, "tools", "i18n", "i18n-check.mjs"))).toBe(true);
+    expect(existsSync(join(targetDir, "apps", "web", "middleware.ts"))).toBe(true);
+    expect(
+      existsSync(
+        join(
+          targetDir,
+          "apps",
+          "web",
+          "app",
+          "captain-auth-provider.tsx",
+        ),
+      ),
+    ).toBe(true);
+    expect(existsSync(join(targetDir, "apps", "web", "components.json"))).toBe(
+      true,
+    );
 
     const rootPkg = JSON.parse(readFileSync(join(targetDir, "package.json"), "utf-8")) as {
       scripts: Record<string, string>;
     };
     expect(rootPkg.scripts["i18n:check"]).toContain("tools/i18n/i18n-check.mjs");
+    expect(rootPkg.scripts["i18n:check"]).not.toContain("CAPTAIN_LOCALES=");
+
+    const webPkg = JSON.parse(
+      readFileSync(join(targetDir, "apps", "web", "package.json"), "utf8"),
+    ) as { dependencies: Record<string, string> };
+    expect(webPkg.dependencies["@clerk/nextjs"]).toBe("^6.22.0");
   });
 
   it("emits Tier A mobile modules and adapters", () => {
@@ -120,6 +141,22 @@ describe("applyRecipes", () => {
     );
     expect(adapterIndex).toContain("gtReactNativeConfig");
     expect(adapterIndex).toContain("nativeWindConfig");
+    expect(
+      existsSync(join(targetDir, "apps", "mobile", "metro.config.js")),
+    ).toBe(true);
+    expect(
+      existsSync(join(targetDir, "apps", "mobile", "global.css")),
+    ).toBe(true);
+    expect(
+      existsSync(
+        join(targetDir, "apps", "mobile", "captain-auth-provider.tsx"),
+      ),
+    ).toBe(true);
+
+    const mobilePkg = JSON.parse(
+      readFileSync(join(targetDir, "apps", "mobile", "package.json"), "utf8"),
+    ) as { dependencies: Record<string, string> };
+    expect(mobilePkg.dependencies.nativewind).toBe("^4.1.23");
   });
 
   it("emits admin-catalog module on init", () => {
