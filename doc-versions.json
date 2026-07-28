@@ -53,6 +53,14 @@
     "tailwindcss": {
       "validated": "4.1.8",
       "docs": "https://tailwindcss.com/docs/installation"
+    },
+    "react": {
+      "validated": "19.1.0",
+      "docs": "https://react.dev/"
+    },
+    "@types/react": {
+      "validated": "19.1.8",
+      "docs": "https://www.npmjs.com/package/@types/react"
     }
   }
 }

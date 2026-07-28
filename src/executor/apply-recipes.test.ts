@@ -186,4 +186,46 @@ describe("applyRecipes", () => {
     ).toBe(true);
   });
 
+  it("emits form-wizard with its React package contract", () => {
+    const targetDir = makeTempDir();
+    seedWebWorkspace(targetDir);
+    applyWorkspacePromotion(webConfig, targetDir);
+
+    const result = applyRecipes(
+      { ...webConfig, modules: ["authorization", "form-wizard"] },
+      targetDir,
+    );
+
+    expect(result.ok).toBe(true);
+    const coreIndex = readFileSync(
+      join(targetDir, "packages", "core", "src", "index.ts"),
+      "utf8",
+    );
+    expect(coreIndex).toContain("createFormWizard");
+    expect(coreIndex).toContain("useFormWizard");
+    const corePackage = JSON.parse(
+      readFileSync(join(targetDir, "packages", "core", "package.json"), "utf8"),
+    ) as { peerDependencies: Record<string, string> };
+    expect(corePackage.peerDependencies.react).toBe("^19.1.0");
+  });
+
+  it("emits the user-identity API and in-memory adapter", () => {
+    const targetDir = makeTempDir();
+    seedWebWorkspace(targetDir);
+    applyWorkspacePromotion(webConfig, targetDir);
+
+    const result = applyRecipes(
+      { ...webConfig, modules: ["authorization", "user-identity"] },
+      targetDir,
+    );
+
+    expect(result.ok).toBe(true);
+    const coreIndex = readFileSync(
+      join(targetDir, "packages", "core", "src", "index.ts"),
+      "utf8",
+    );
+    expect(coreIndex).toContain("createUserIdentity");
+    expect(coreIndex).toContain("createInMemoryUserIdentityAdapter");
+  });
+
 });

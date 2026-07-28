@@ -299,6 +299,35 @@ function applyModuleAdminCatalog(targetDir: string, vars: RecipeVars): void {
   renderModuleFile("modules/admin-catalog/driver.ts", join(catalogDir, "driver.ts"), vars);
 }
 
+function applyModuleFormWizard(targetDir: string, vars: RecipeVars): void {
+  const wizardDir = join(coreDir(targetDir), "src", "form-wizard");
+  mkdirSync(wizardDir, { recursive: true });
+
+  renderModuleFile("modules/form-wizard/types.ts", join(wizardDir, "types.ts"), vars);
+  renderModuleFile("modules/form-wizard/wizard.ts", join(wizardDir, "wizard.ts"), vars);
+  renderModuleFile(
+    "modules/form-wizard/use-form-wizard.ts",
+    join(wizardDir, "use-form-wizard.ts"),
+    vars,
+  );
+  mergePackageJson(join(coreDir(targetDir), "package.json"), {
+    peerDependencies: { react: testedRange("react") },
+    devDependencies: {
+      "@types/react": testedRange("@types/react"),
+      react: testedRange("react"),
+    },
+  });
+}
+
+function applyModuleUserIdentity(targetDir: string, vars: RecipeVars): void {
+  const identityDir = join(coreDir(targetDir), "src", "user-identity");
+  mkdirSync(identityDir, { recursive: true });
+
+  renderModuleFile("modules/user-identity/types.ts", join(identityDir, "types.ts"), vars);
+  renderModuleFile("modules/user-identity/identity.ts", join(identityDir, "identity.ts"), vars);
+  renderModuleFile("modules/user-identity/in-memory.ts", join(identityDir, "in-memory.ts"), vars);
+}
+
 function writeCoreIndex(
   targetDir: string,
   _vars: RecipeVars,
@@ -321,6 +350,24 @@ function writeCoreIndex(
     lines.push(
       'export type { AdminCatalogConfig, AdminCatalogDriver, CatalogColumnDef, CatalogListItem } from "./admin-catalog/types.js";',
       'export { createAdminCatalogDriver } from "./admin-catalog/driver.js";',
+    );
+  }
+
+  if (applied.has("module-form-wizard")) {
+    lines.push(
+      'export type { FormWizardConfig, FormWizardStepDef, FormWizardSubmitAdapter, FormWizardUploadAdapter } from "./form-wizard/types.js";',
+      'export type { FormWizardController, FormWizardState } from "./form-wizard/wizard.js";',
+      'export { createFormWizard } from "./form-wizard/wizard.js";',
+      'export { useFormWizard } from "./form-wizard/use-form-wizard.js";',
+    );
+  }
+
+  if (applied.has("module-user-identity")) {
+    lines.push(
+      'export type { UserIdentityAdapter, UserIdentityConfig, UserProfile, UserRole } from "./user-identity/types.js";',
+      'export type { UserIdentity } from "./user-identity/identity.js";',
+      'export { createUserIdentity } from "./user-identity/identity.js";',
+      'export { createInMemoryUserIdentityAdapter } from "./user-identity/in-memory.js";',
     );
   }
 
@@ -459,6 +506,12 @@ function applyRecipeStep(
     case "module-admin-catalog":
       applyModuleAdminCatalog(targetDir, vars);
       break;
+    case "module-form-wizard":
+      applyModuleFormWizard(targetDir, vars);
+      break;
+    case "module-user-identity":
+      applyModuleUserIdentity(targetDir, vars);
+      break;
     default:
       throw new Error(`Recipe step "${step.id}" is not implemented`);
   }
@@ -498,6 +551,8 @@ export function recipeStepIsImplemented(stepId: string): boolean {
     "backend-rest",
     "module-authorization",
     "module-admin-catalog",
+    "module-form-wizard",
+    "module-user-identity",
     "auth-clerk",
     "i18n-web-gt-next",
     "i18n-mobile-gt-react-native",
