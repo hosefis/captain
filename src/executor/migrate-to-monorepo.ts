@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { applyRecipes } from "./apply-recipes.js";
+import { applyAddedAppRecipes } from "./apply-recipes.js";
 import { applyConfigEmit } from "./config-emit.js";
 import { applyWorkspacePromotion } from "./workspace-promote.js";
 import { loadCompatibilityMatrix, resolveCompatibility } from "../resolver/compatibility.js";
@@ -211,12 +211,18 @@ export async function migrateToMonorepo(options: {
 
   applyWorkspacePromotion(nextConfig, targetDir);
 
-  const recipeResult = applyRecipes(nextConfig, targetDir);
-  if (!recipeResult.ok) {
-    return {
-      ok: false,
-      message: `Recipe "${recipeResult.stepId}" failed: ${recipeResult.message}`,
-    };
+  if (options.addApp === "web" || options.addApp === "mobile") {
+    const recipeResult = applyAddedAppRecipes(
+      nextConfig,
+      targetDir,
+      options.addApp,
+    );
+    if (!recipeResult.ok) {
+      return {
+        ok: false,
+        message: `Recipe "${recipeResult.stepId}" failed: ${recipeResult.message}`,
+      };
+    }
   }
 
   applyConfigEmit(nextConfig, targetDir);

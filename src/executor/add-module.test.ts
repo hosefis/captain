@@ -145,4 +145,22 @@ describe("addModuleToProject", () => {
     expect(result.ok).toBe(false);
     expect(readFileSync(join(collision, "owned.ts"), "utf8")).toBe("// mine\n");
   });
+
+  it("does not overwrite an edited core export index", () => {
+    const targetDir = makeTempDir();
+    seedProject(targetDir, webConfig);
+    const indexPath = join(targetDir, "packages", "core", "src", "index.ts");
+    writeFileSync(indexPath, "// user-owned exports\n");
+
+    const result = addModuleToProject({
+      moduleName: "form-wizard",
+      targetDir,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(readFileSync(indexPath, "utf8")).toBe("// user-owned exports\n");
+    expect(
+      existsSync(join(targetDir, "packages", "core", "src", "form-wizard")),
+    ).toBe(false);
+  });
 });

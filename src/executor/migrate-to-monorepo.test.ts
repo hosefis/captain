@@ -54,6 +54,8 @@ describe("migrateToMonorepo", () => {
   it("converts standalone web project to monorepo topology", async () => {
     const targetDir = makeTempDir();
     seedStandaloneWeb(targetDir);
+    const layoutPath = join(targetDir, "apps", "web", "app", "layout.tsx");
+    writeFileSync(layoutPath, "// user-owned layout\n");
 
     const result = await migrateToMonorepo({ targetDir });
 
@@ -77,11 +79,14 @@ describe("migrateToMonorepo", () => {
       scripts: Record<string, string>;
     };
     expect(rootPkg.scripts.dev).toBe("turbo dev");
+    expect(readFileSync(layoutPath, "utf8")).toBe("// user-owned layout\n");
   });
 
   it("bootstraps a mobile app when --add mobile", async () => {
     const targetDir = makeTempDir();
     seedStandaloneWeb(targetDir);
+    const layoutPath = join(targetDir, "apps", "web", "app", "layout.tsx");
+    writeFileSync(layoutPath, "// user-owned layout\n");
 
     const seen: string[] = [];
     const result = await migrateToMonorepo({
@@ -103,6 +108,7 @@ describe("migrateToMonorepo", () => {
     expect(seen).toEqual(["bootstrap-apps-mobile"]);
     expect(existsSync(join(targetDir, "apps", "mobile", "package.json"))).toBe(true);
     expect(existsSync(join(targetDir, "packages", "adapters-expo"))).toBe(true);
+    expect(readFileSync(layoutPath, "utf8")).toBe("// user-owned layout\n");
   });
 
   it("rejects migrating an already-monorepo project", async () => {

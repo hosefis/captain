@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { writeRenderedFile } from "../generators/template.js";
 import { templatesDir } from "../lib/paths.js";
 import { resolveRecipePlan, type RecipeStep } from "../resolver/recipe-plan.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { App, NormalizedProjectConfig } from "../schema/project-config.js";
 import { mergePackageJson } from "./package-json.js";
 import { buildRecipeVars, type RecipeVars } from "./recipe-vars.js";
 import { testedRange } from "./tested-versions.js";
@@ -51,19 +51,25 @@ function renderModuleFile(
   writeRenderedFile(join(templatesDir(), templateRelativePath), targetPath, vars);
 }
 
-function applyBackendRest(targetDir: string, config: NormalizedProjectConfig, vars: RecipeVars): void {
+function applyBackendRest(
+  targetDir: string,
+  config: NormalizedProjectConfig,
+  vars: RecipeVars,
+  onlyApp?: App,
+): void {
   const core = coreDir(targetDir);
-  mkdirSync(join(core, "src", "backend"), { recursive: true });
+  if (!onlyApp) {
+    mkdirSync(join(core, "src", "backend"), { recursive: true });
+    renderModuleFile("modules/backend-client/client.ts", join(core, "src", "backend", "client.ts"), vars);
+    renderModuleFile(
+      "modules/backend-client/http-client.ts",
+      join(core, "src", "backend", "http-client.ts"),
+      vars,
+    );
+    renderModuleFile("modules/backend-client/core-index.ts", join(core, "src", "index.ts"), vars);
+  }
 
-  renderModuleFile("modules/backend-client/client.ts", join(core, "src", "backend", "client.ts"), vars);
-  renderModuleFile(
-    "modules/backend-client/http-client.ts",
-    join(core, "src", "backend", "http-client.ts"),
-    vars,
-  );
-  renderModuleFile("modules/backend-client/core-index.ts", join(core, "src", "index.ts"), vars);
-
-  if (config.stacks.hasWeb) {
+  if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
     mkdirSync(join(adapterDir(targetDir, "adapters-next"), "src", "backend"), { recursive: true });
     renderModuleFile(
       "adapters/backend/rest-next.ts",
@@ -72,7 +78,7 @@ function applyBackendRest(targetDir: string, config: NormalizedProjectConfig, va
     );
   }
 
-  if (config.stacks.hasMobile) {
+  if (config.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
     mkdirSync(join(adapterDir(targetDir, "adapters-expo"), "src", "backend"), { recursive: true });
     renderModuleFile(
       "adapters/backend/rest-expo.ts",
@@ -91,8 +97,13 @@ function applyModuleAuthorization(targetDir: string, vars: RecipeVars): void {
   renderModuleFile("modules/authorization/in-memory.ts", join(authDir, "in-memory.ts"), vars);
 }
 
-function applyAuthClerk(targetDir: string, config: NormalizedProjectConfig, vars: RecipeVars): void {
-  if (config.stacks.hasWeb) {
+function applyAuthClerk(
+  targetDir: string,
+  config: NormalizedProjectConfig,
+  vars: RecipeVars,
+  onlyApp?: App,
+): void {
+  if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
     mkdirSync(join(adapterDir(targetDir, "adapters-next"), "src", "auth"), { recursive: true });
     renderModuleFile(
       "adapters/auth/clerk-next.ts",
@@ -126,7 +137,7 @@ function applyAuthClerk(targetDir: string, config: NormalizedProjectConfig, vars
     });
   }
 
-  if (config.stacks.hasMobile) {
+  if (config.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
     mkdirSync(join(adapterDir(targetDir, "adapters-expo"), "src", "auth"), { recursive: true });
     renderModuleFile(
       "adapters/auth/clerk-expo.ts",
@@ -328,11 +339,7 @@ function applyModuleUserIdentity(targetDir: string, vars: RecipeVars): void {
   renderModuleFile("modules/user-identity/in-memory.ts", join(identityDir, "in-memory.ts"), vars);
 }
 
-function writeCoreIndex(
-  targetDir: string,
-  _vars: RecipeVars,
-  applied: Set<string>,
-): void {
+function buildCoreIndex(applied: Set<string>): string {
   const lines = [
     'export type { BackendClient, BackendClientFactory, HttpMethod, HttpRequestOptions } from "./backend/client.js";',
     'export { createHttpClient, type HttpClientConfig } from "./backend/http-client.js";',
@@ -373,7 +380,11 @@ function writeCoreIndex(
 
   lines.push('export const CAPTAIN_CORE_VERSION = "0.1.0";');
 
-  writeFileSync(join(coreDir(targetDir), "src", "index.ts"), `${lines.join("\n")}\n`);
+  return `${lines.join("\n")}\n`;
+}
+
+function writeCoreIndex(targetDir: string, applied: Set<string>): void {
+  writeFileSync(join(coreDir(targetDir), "src", "index.ts"), buildCoreIndex(applied));
 }
 
 function appliedStepsForConfig(config: NormalizedProjectConfig): Set<string> {
@@ -382,6 +393,10 @@ function appliedStepsForConfig(config: NormalizedProjectConfig): Set<string> {
       .filter((step) => !WORKSPACE_CONFIG_STEPS.has(step.id))
       .map((step) => step.id),
   );
+}
+
+export function renderCoreIndex(config: NormalizedProjectConfig): string {
+  return buildCoreIndex(appliedStepsForConfig(config));
 }
 
 function buildAdapterIndex(
@@ -424,8 +439,9 @@ function writeAdapterIndexes(
   config: NormalizedProjectConfig,
   vars: RecipeVars,
   applied: Set<string>,
+  onlyApp?: App,
 ): void {
-  if (config.stacks.hasWeb) {
+  if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
     const exports: AdapterExports = {};
     if (applied.has("backend-rest")) {
       exports.backend = ["createRestBackendClient"];
@@ -447,7 +463,7 @@ function writeAdapterIndexes(
     }
   }
 
-  if (config.stacks.hasMobile) {
+  if (config.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
     const exports: AdapterExports = {};
     if (applied.has("backend-rest")) {
       exports.backend = ["createRestBackendClient"];
@@ -544,7 +560,7 @@ export function applyRecipes(
   }
 
   try {
-    writeCoreIndex(targetDir, vars, applied);
+    writeCoreIndex(targetDir, applied);
     writeAdapterIndexes(targetDir, config, vars, applied);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Adapter index generation failed";
@@ -568,7 +584,7 @@ export function applyOptionalModuleRecipe(
 
   try {
     applyRecipeStep(step, targetDir, config, vars);
-    writeCoreIndex(targetDir, vars, appliedStepsForConfig(config));
+    writeCoreIndex(targetDir, appliedStepsForConfig(config));
     return { ok: true, appliedRecipes: [step.id] };
   } catch (error) {
     return {
@@ -576,6 +592,53 @@ export function applyOptionalModuleRecipe(
       stepId: step.id,
       message:
         error instanceof Error ? error.message : "Module recipe application failed",
+    };
+  }
+}
+
+export function applyAddedAppRecipes(
+  config: NormalizedProjectConfig,
+  targetDir: string,
+  app: Extract<App, "web" | "mobile">,
+): ApplyRecipesResult {
+  const vars = buildRecipeVars(config);
+  const applied = appliedStepsForConfig(config);
+
+  try {
+    if (applied.has("backend-rest")) {
+      applyBackendRest(targetDir, config, vars, app);
+    }
+    if (applied.has("auth-clerk")) {
+      applyAuthClerk(targetDir, config, vars, app);
+    }
+
+    if (app === "web") {
+      if (applied.has("i18n-web-gt-next")) {
+        applyI18nWebGtNext(targetDir, vars);
+      }
+      if (applied.has("ui-web-shadcn-base-ui")) {
+        applyUiWebShadcnBaseUi(targetDir, vars);
+      }
+    } else {
+      if (applied.has("i18n-mobile-gt-react-native")) {
+        applyI18nMobileGtReactNative(targetDir, vars);
+      }
+      if (applied.has("expo-localization")) {
+        applyExpoLocalization(targetDir);
+      }
+      if (applied.has("ui-mobile-nativewind")) {
+        applyUiMobileNativewind(targetDir, vars);
+      }
+    }
+
+    writeAdapterIndexes(targetDir, config, vars, applied, app);
+    return { ok: true, appliedRecipes: [...applied] };
+  } catch (error) {
+    return {
+      ok: false,
+      stepId: `app-${app}`,
+      message:
+        error instanceof Error ? error.message : "Added app recipe application failed",
     };
   }
 }

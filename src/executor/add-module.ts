@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyOptionalModuleRecipe } from "./apply-recipes.js";
+import { applyOptionalModuleRecipe, renderCoreIndex } from "./apply-recipes.js";
 import { applyConfigEmit } from "./config-emit.js";
 import { loadCompatibilityMatrix, resolveCompatibility } from "../resolver/compatibility.js";
 import type { CaptainModule, NormalizedProjectConfig } from "../schema/project-config.js";
@@ -86,6 +86,18 @@ export function addModuleToProject(options: {
     return {
       ok: false,
       message: `Unsafe collision at ${moduleDirectory}; inspect it or rerun with --force`,
+    };
+  }
+
+  const coreIndexPath = join(targetDir, "packages", "core", "src", "index.ts");
+  if (
+    existsSync(coreIndexPath) &&
+    readFileSync(coreIndexPath, "utf-8") !== renderCoreIndex(config) &&
+    !options.force
+  ) {
+    return {
+      ok: false,
+      message: `Unsafe collision at ${coreIndexPath}; preserve its exports or rerun with --force`,
     };
   }
 
