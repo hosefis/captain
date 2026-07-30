@@ -13,7 +13,6 @@
   },
   "files": [
     "dist",
-    "recipes",
     "templates",
     "compatibility.json",
     "doc-versions.json"
@@ -38,8 +37,5 @@
     "tsup": "^8.4.0",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
   }
 }

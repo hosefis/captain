@@ -1,24 +1,29 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { z, toJSONSchema } from "zod";
+import { toJSONSchema, z } from "zod";
+import {
+  optionValues,
+  SUPPORTED_OPTIONS,
+} from "../supported-options.js";
 
-export const packageManagerSchema = z.enum(["pnpm", "npm", "bun"]);
-export const topologySchema = z.enum(["web", "mobile", "monorepo"]);
-export const appSchema = z.enum(["web", "mobile", "desktop"]);
-export const backendSchema = z.enum(["rest", "convex", "supabase", "firebase"]);
-export const authSchema = z.enum(["clerk", "better-auth", "workos", "skip"]);
-export const i18nWebSchema = z.enum(["gt-next", "next-intl"]);
-export const i18nMobileSchema = z.enum(["gt-react-native", "react-i18next"]);
-export const uiWebSchema = z.enum(["shadcn-base-ui", "shadcn-radix", "tailwind-only"]);
-export const uiMobileSchema = z.enum(["nativewind", "paper", "none"]);
-export const moduleSchema = z.enum([
-  "authorization",
-  "admin-catalog",
-  "form-wizard",
-  "user-identity",
-]);
-export const expoRuntimeSchema = z.enum(["expo-go", "dev-build"]);
-export const validationModeSchema = z.enum(["strict", "relaxed"]);
+export const packageManagerSchema = z.enum(
+  optionValues(SUPPORTED_OPTIONS.packageManagers),
+);
+export const topologySchema = z.enum(optionValues(SUPPORTED_OPTIONS.topologies));
+export const appSchema = z.enum(["web", "mobile"]);
+export const backendSchema = z.enum(optionValues(SUPPORTED_OPTIONS.backends));
+export const authSchema = z.enum(
+  optionValues(SUPPORTED_OPTIONS.authentication),
+);
+export const i18nWebSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webI18n));
+export const i18nMobileSchema = z.enum(
+  optionValues(SUPPORTED_OPTIONS.mobileI18n),
+);
+export const uiWebSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webUi));
+export const uiMobileSchema = z.enum(optionValues(SUPPORTED_OPTIONS.mobileUi));
+export const expoRuntimeSchema = z.enum(
+  optionValues(SUPPORTED_OPTIONS.runtimes),
+);
 
 const scopeSchema = z
   .string()
@@ -52,28 +57,32 @@ export const projectConfigSchema = z
     auth: authSchema.default("clerk"),
     i18n: i18nInputSchema,
     ui: uiInputSchema,
-    modules: z.array(moduleSchema).default(["authorization"]),
-    payment: z
-      .never({
-        error:
-          "payment is deferred from this release; see docs/specs/payment-release.md",
-      })
-      .optional(),
     locales: z.array(z.string().min(2)).min(1).default(["en", "fr"]),
     defaultLocale: z.string().min(2).default("en"),
     runtime: expoRuntimeSchema.optional(),
-    validation: validationModeSchema.default("strict"),
   })
-  .transform(({ payment: _payment, ...config }) => config)
+  .strict()
   .superRefine((config, ctx) => {
-    if (config.topology === "monorepo") {
-      if (!config.apps || config.apps.length === 0) {
-        ctx.addIssue({
-          code: "custom",
-          message: "monorepo topology requires at least one app in apps[]",
-          path: ["apps"],
-        });
-      }
+    if (
+      config.topology === "monorepo" &&
+      config.apps !== undefined &&
+      (config.apps.length !== 2 ||
+        !config.apps.includes("web") ||
+        !config.apps.includes("mobile"))
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "monorepo currently supports exactly web and mobile",
+        path: ["apps"],
+      });
+    }
+
+    if (config.topology !== "monorepo" && config.apps !== undefined) {
+      ctx.addIssue({
+        code: "custom",
+        message: "apps[] is only valid for monorepo topology",
+        path: ["apps"],
+      });
     }
 
     if (config.defaultLocale && !config.locales.includes(config.defaultLocale)) {
@@ -84,19 +93,34 @@ export const projectConfigSchema = z
       });
     }
 
-    if (config.topology === "mobile" && !config.runtime) {
+    const hasMobile =
+      config.topology === "mobile" || config.topology === "monorepo";
+    if (hasMobile && !config.runtime) {
       ctx.addIssue({
         code: "custom",
-        message: "mobile topology requires runtime (expo-go | dev-build)",
+        message: "mobile projects require runtime (expo-go | dev-build)",
         path: ["runtime"],
       });
     }
 
-    if (config.topology === "monorepo" && config.apps?.includes("mobile") && !config.runtime) {
+    const mobileI18n =
+      typeof config.i18n === "object" ? config.i18n.mobile : config.i18n;
+    if (hasMobile && config.runtime === "expo-go" && mobileI18n !== "none") {
       ctx.addIssue({
         code: "custom",
-        message: "monorepo with mobile app requires runtime (expo-go | dev-build)",
-        path: ["runtime"],
+        message: "Expo Go currently requires mobile i18n to be none",
+        path: ["i18n"],
+      });
+    }
+    if (
+      hasMobile &&
+      config.runtime === "dev-build" &&
+      mobileI18n !== "gt-react-native"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Expo development builds currently use gt-react-native",
+        path: ["i18n"],
       });
     }
   });
@@ -111,7 +135,6 @@ export type I18nWeb = z.infer<typeof i18nWebSchema>;
 export type I18nMobile = z.infer<typeof i18nMobileSchema>;
 export type UiWeb = z.infer<typeof uiWebSchema>;
 export type UiMobile = z.infer<typeof uiMobileSchema>;
-export type CaptainModule = z.infer<typeof moduleSchema>;
 export type ExpoRuntime = z.infer<typeof expoRuntimeSchema>;
 
 export type NormalizedI18n = {
@@ -127,10 +150,9 @@ export type NormalizedUi = {
 export type ProjectStacks = {
   hasWeb: boolean;
   hasMobile: boolean;
-  hasDesktop: boolean;
 };
 
-export type NormalizedProjectConfig = ProjectConfig & {
+export type NormalizedProjectConfig = Omit<ProjectConfig, "apps" | "i18n" | "ui"> & {
   apps: App[];
   i18n: NormalizedI18n;
   ui: NormalizedUi;
@@ -144,34 +166,34 @@ function resolveApps(config: ProjectConfig): App[] {
   if (config.topology === "mobile") {
     return ["mobile"];
   }
-  return config.apps ?? [];
+  return ["web", "mobile"];
 }
 
 function normalizeI18n(config: ProjectConfig, apps: App[]): NormalizedI18n {
   if (typeof config.i18n === "string") {
-    if (config.topology === "web" || apps.includes("web")) {
+    if (config.topology === "web") {
       return { web: config.i18n as I18nWeb };
     }
     return { mobile: config.i18n as I18nMobile };
   }
 
   return {
-    web: config.i18n.web,
-    mobile: config.i18n.mobile,
+    web: apps.includes("web") ? config.i18n.web : undefined,
+    mobile: apps.includes("mobile") ? config.i18n.mobile : undefined,
   };
 }
 
 function normalizeUi(config: ProjectConfig, apps: App[]): NormalizedUi {
   if (typeof config.ui === "string") {
-    if (config.topology === "web" || apps.includes("web")) {
+    if (config.topology === "web") {
       return { web: config.ui as UiWeb };
     }
     return { mobile: config.ui as UiMobile };
   }
 
   return {
-    web: config.ui.web,
-    mobile: config.ui.mobile,
+    web: apps.includes("web") ? config.ui.web : undefined,
+    mobile: apps.includes("mobile") ? config.ui.mobile : undefined,
   };
 }
 
@@ -188,14 +210,12 @@ export function normalizeProjectConfig(config: ProjectConfig): NormalizedProject
     stacks: {
       hasWeb: apps.includes("web"),
       hasMobile: apps.includes("mobile"),
-      hasDesktop: apps.includes("desktop"),
     },
   };
 }
 
 export function parseProjectConfig(input: unknown): NormalizedProjectConfig {
-  const parsed = projectConfigSchema.parse(input);
-  return normalizeProjectConfig(parsed);
+  return normalizeProjectConfig(projectConfigSchema.parse(input));
 }
 
 export function projectConfigJsonSchema(): Record<string, unknown> {
@@ -209,6 +229,5 @@ export function projectConfigJsonSchema(): Record<string, unknown> {
 export function loadProjectConfigFromFile(configPath: string): NormalizedProjectConfig {
   const absolutePath = path.resolve(configPath);
   const raw = readFileSync(absolutePath, "utf-8");
-  const json: unknown = JSON.parse(raw);
-  return parseProjectConfig(json);
+  return parseProjectConfig(JSON.parse(raw) as unknown);
 }

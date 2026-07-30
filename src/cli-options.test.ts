@@ -13,7 +13,6 @@ describe("getGlobalOptions", () => {
       dryRun: false,
       json: false,
       verifyDocs: false,
-      force: false,
     });
   });
 
@@ -25,7 +24,6 @@ describe("getGlobalOptions", () => {
         dryRun: true,
         json: true,
         verifyDocs: true,
-        force: true,
       }),
     };
 
@@ -35,7 +33,6 @@ describe("getGlobalOptions", () => {
       dryRun: true,
       json: true,
       verifyDocs: true,
-      force: true,
     });
   });
 });

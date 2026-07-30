@@ -1,9 +1,0 @@
-{
-  "{i18nNamespace}": {
-    "title": "{resourceTitleFr}",
-    "create": "Créer {resourceTitleFr}",
-    "edit": "Modifier {resourceTitleFr}",
-    "archive": "Archiver",
-    "restore": "Restaurer"
-  }
-}

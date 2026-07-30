@@ -2,10 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
-import { registerAddModuleCommand } from "./commands/add-module.js";
 import { registerInitCommand } from "./commands/init.js";
-import { registerMigrateToMonorepoCommand } from "./commands/migrate-to-monorepo.js";
-import { registerScaffoldCatalogCommand } from "./commands/scaffold-catalog.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageJson = JSON.parse(
@@ -20,19 +17,15 @@ export function createProgram(): Command {
     )
     .version(packageJson.version)
     .option("--config <path>", "Agent input: path to project.json")
-    .option("--yes", "Accept defaults and skip confirmations")
+    .option("--yes", "Skip the final confirmation")
     .option("--dry-run", "Print execution plan without making changes")
     .option("--json", "Emit machine-readable output")
-    .option("--force", "Allow preflighted generated-file replacements")
     .option(
       "--verify-docs",
       "Report npm-latest vs bundled recipe version drift",
     );
 
   registerInitCommand(program);
-  registerAddModuleCommand(program);
-  registerScaffoldCatalogCommand(program);
-  registerMigrateToMonorepoCommand(program);
   return program;
 }
 

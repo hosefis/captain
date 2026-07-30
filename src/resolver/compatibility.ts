@@ -1,11 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type {
-  Auth,
-  Backend,
-  NormalizedProjectConfig,
-} from "../schema/project-config.js";
+import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
 export type CompatibilityMode = "agent" | "human";
 
@@ -22,7 +18,7 @@ export type CompatibilityResult = {
   warns: CompatibilityIssue[];
 };
 
-export type StackKind = "next" | "expo" | "electron";
+export type StackKind = "next" | "expo";
 
 type HardBlockRule = {
   id?: string;
@@ -45,12 +41,10 @@ type SoftWarnRule = {
 
 type RecipeBlockRule = {
   id: string;
-  backend?: Backend;
-  auth?: Auth | "authjs";
+  backend?: string;
+  auth?: string;
   i18n?: string;
   ui?: string;
-  module?: string;
-  app?: string;
   message: string;
 };
 
@@ -95,9 +89,6 @@ function activeStacks(config: NormalizedProjectConfig): StackKind[] {
   }
   if (config.stacks.hasMobile) {
     stacks.push("expo");
-  }
-  if (config.stacks.hasDesktop) {
-    stacks.push("electron");
   }
   return stacks;
 }
@@ -196,14 +187,6 @@ function matchesRecipeBlock(
     if (!values.includes(rule.ui as typeof values[number])) {
       return false;
     }
-  }
-
-  if (rule.module !== undefined && !config.modules.includes(rule.module as never)) {
-    return false;
-  }
-
-  if (rule.app !== undefined && !config.apps.includes(rule.app as never)) {
-    return false;
   }
 
   return true;
