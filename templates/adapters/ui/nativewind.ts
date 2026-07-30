@@ -3,7 +3,7 @@
  * See nativewind.dev for metro/babel plugin configuration.
  */
 export const nativeWindConfig = {
-  input: "./global.css",
+  input: "./src/global.css",
   presets: ["nativewind/preset"],
 } as const;
 

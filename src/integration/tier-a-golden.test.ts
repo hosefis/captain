@@ -18,10 +18,8 @@ function tierABase(overrides: Partial<ProjectConfig>): ProjectConfig {
     auth: "clerk",
     i18n: "gt-next",
     ui: "shadcn-base-ui",
-    modules: ["authorization"],
     locales: ["en", "fr"],
     defaultLocale: "en",
-    validation: "strict",
     ...overrides,
   };
 }

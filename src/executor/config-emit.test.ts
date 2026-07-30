@@ -3,7 +3,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { applyConfigEmit } from "./config-emit.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import {
+  loadProjectConfigFromFile,
+  type NormalizedProjectConfig,
+} from "../schema/project-config.js";
 
 const config: NormalizedProjectConfig = {
   name: "acme-web",
@@ -15,11 +18,9 @@ const config: NormalizedProjectConfig = {
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
-  modules: ["authorization"],
   locales: ["en", "fr"],
   defaultLocale: "en",
-  validation: "strict",
-  stacks: { hasWeb: true, hasMobile: false, hasDesktop: false },
+  stacks: { hasWeb: true, hasMobile: false },
 };
 
 describe("applyConfigEmit", () => {
@@ -43,5 +44,9 @@ describe("applyConfigEmit", () => {
     expect(projectJson.name).toBe("acme-web");
     expect(projectJson.scope).toBe("@acme");
     expect("stacks" in projectJson).toBe(false);
+    expect("apps" in projectJson).toBe(false);
+    expect(loadProjectConfigFromFile(join(targetDir, "project.json")).apps).toEqual([
+      "web",
+    ]);
   });
 });

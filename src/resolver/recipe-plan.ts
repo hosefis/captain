@@ -9,11 +9,12 @@ export type RecipeStep = {
 export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[] {
   const steps: RecipeStep[] = [
     {
-      id: "workspace-promote",
+      id: "project-structure",
       phase: "workspace",
-      description: `Promote to workspace: package.json workspaces${
-        config.packageManager === "pnpm" ? ", pnpm-workspace.yaml" : ""
-      }, packages/core, packages/adapters-*`,
+      description:
+        config.topology === "monorepo"
+          ? "Configure Turborepo workspace and shared packages"
+          : "Configure framework-native src directories",
     },
     {
       id: "context-md",
@@ -38,7 +39,7 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     description: `BackendClient adapter for backend: ${config.backend}`,
   });
 
-  if (config.auth !== "skip") {
+  if (config.auth !== "none") {
     steps.push({
       id: "module-authorization",
       phase: "module",
@@ -64,7 +65,7 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     });
   }
 
-  if (config.i18n.mobile) {
+  if (config.i18n.mobile && config.i18n.mobile !== "none") {
     steps.push({
       id: `i18n-mobile-${config.i18n.mobile}`,
       phase: "adapter",
@@ -90,17 +91,6 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
       id: `ui-mobile-${config.ui.mobile}`,
       phase: "adapter",
       description: `Mobile UI adapter: ${config.ui.mobile}`,
-    });
-  }
-
-  for (const moduleId of config.modules) {
-    if (moduleId === "authorization") {
-      continue;
-    }
-    steps.push({
-      id: `module-${moduleId}`,
-      phase: "module",
-      description: `Deep module: ${moduleId}`,
     });
   }
 

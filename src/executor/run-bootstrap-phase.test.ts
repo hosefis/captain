@@ -15,11 +15,9 @@ const webConfig: NormalizedProjectConfig = {
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
-  modules: ["authorization"],
   locales: ["en", "fr"],
   defaultLocale: "en",
-  validation: "strict",
-  stacks: { hasWeb: true, hasMobile: false, hasDesktop: false },
+  stacks: { hasWeb: true, hasMobile: false },
 };
 
 function makeTempDir(): string {
@@ -31,10 +29,12 @@ function makeTempDir(): string {
 describe("runBootstrapPhase", () => {
   it("completes end-to-end with mocked bootstrap runner", async () => {
     const targetDir = makeTempDir();
+    const progress: string[] = [];
 
     const result = await runBootstrapPhase(webConfig, targetDir, {
       bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
       simulateBootstrapOutput: true,
+      onProgress: (event) => progress.push(`${event.status}:${event.id}`),
     });
 
     expect(result.ok).toBe(true);
@@ -46,16 +46,22 @@ describe("runBootstrapPhase", () => {
       "bootstrap-web",
       "install-root",
     ]);
-    expect(result.appliedRecipes).toContain("workspace-promote");
+    expect(result.appliedRecipes).toContain("project-structure");
     expect(result.appliedRecipes).toContain("backend-rest");
     expect(result.appliedRecipes).toContain("module-authorization");
     expect(result.appliedRecipes).toContain("auth-clerk");
-    expect(existsSync(join(targetDir, "packages", "core", "src", "backend", "client.ts"))).toBe(true);
-    expect(existsSync(join(targetDir, "packages", "core", "src", "authorization", "types.ts"))).toBe(true);
+    expect(existsSync(join(targetDir, "src", "lib", "backend", "client.ts"))).toBe(true);
+    expect(existsSync(join(targetDir, "src", "features", "authorization", "types.ts"))).toBe(true);
     expect(existsSync(join(targetDir, "CONTEXT.md"))).toBe(true);
     expect(existsSync(join(targetDir, ".env.example"))).toBe(true);
     expect(existsSync(join(targetDir, "project.json"))).toBe(true);
-    expect(readFileSync(join(targetDir, "apps/web/package.json"), "utf-8")).toContain("@acme/web");
+    expect(readFileSync(join(targetDir, "package.json"), "utf-8")).toContain('"name": "acme-web"');
+    expect(existsSync(join(targetDir, "src/lib/backend/client.ts"))).toBe(true);
+    expect(existsSync(join(targetDir, "turbo.json"))).toBe(false);
+    expect(progress).toContain("start:bootstrap-web");
+    expect(progress).toContain("complete:bootstrap-web");
+    expect(progress).toContain("start:backend-rest");
+    expect(progress).toContain("complete:install-root");
   });
 
   it("returns bootstrap failure from runner", async () => {

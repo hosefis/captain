@@ -90,11 +90,11 @@ export function resolvePackagesForConfig(config: NormalizedProjectConfig): strin
     packages.add("gt-react-native");
   }
 
-  if (config.stacks.hasMobile) {
+  if (config.i18n.mobile === "gt-react-native") {
     packages.add("expo-localization");
   }
 
-  if (config.ui.web === "shadcn-base-ui" || config.ui.web === "shadcn-radix") {
+  if (config.ui.web === "shadcn-base-ui") {
     packages.add("shadcn");
   }
 

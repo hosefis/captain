@@ -44,11 +44,9 @@ writeFileSync(
           : hasWeb
             ? "shadcn-base-ui"
             : "nativewind",
-      modules: ["authorization"],
       ...(hasMobile ? { runtime: "dev-build" } : {}),
       locales: ["en", "fr"],
       defaultLocale: "en",
-      validation: "strict",
     },
     null,
     2,

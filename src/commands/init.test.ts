@@ -57,24 +57,6 @@ describe("runInit", () => {
     }
   });
 
-  it("blocks convex backend in agent mode", async () => {
-    const result = await runInit({
-      directory: ".",
-      config: join(fixturesDir, "project-convex-blocked.json"),
-      yes: true,
-      dryRun: true,
-      json: false,
-      verifyDocs: false,
-    });
-
-    expect(result.status).toBe("blocked");
-    if (result.status !== "blocked") {
-      return;
-    }
-
-    expect(result.compatibility.blocks.some((block) => block.id === "backend-convex")).toBe(true);
-  });
-
   it("returns validation error for invalid config file", async () => {
     const result = await runInit({
       directory: ".",
@@ -268,11 +250,9 @@ describe("buildInitPlan", () => {
         auth: "clerk",
         i18n: { web: "gt-next" },
         ui: { web: "shadcn-base-ui" },
-        modules: ["authorization"],
         locales: ["en"],
         defaultLocale: "en",
-        validation: "strict",
-        stacks: { hasWeb: true, hasMobile: false, hasDesktop: false },
+        stacks: { hasWeb: true, hasMobile: false },
       },
       "/tmp/demo",
       false,

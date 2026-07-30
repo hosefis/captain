@@ -22,11 +22,9 @@ const tierAWebConfig: NormalizedProjectConfig = {
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
-  modules: ["authorization"],
   locales: ["en", "fr"],
   defaultLocale: "en",
-  validation: "strict",
-  stacks: { hasWeb: true, hasMobile: false, hasDesktop: false },
+  stacks: { hasWeb: true, hasMobile: false },
 };
 
 function makeTempDir(): string {

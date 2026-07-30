@@ -13,7 +13,3 @@ export function captainPackageRoot(): string {
 export function templatesDir(): string {
   return join(captainPackageRoot(), "templates");
 }
-
-export function recipesDir(): string {
-  return join(captainPackageRoot(), "recipes");
-}

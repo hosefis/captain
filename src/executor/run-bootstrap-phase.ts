@@ -9,7 +9,7 @@ import {
   type BootstrapRunResult,
   type BootstrapRunner,
 } from "./bootstrap-run.js";
-import { applyWorkspacePromotion } from "./workspace-promote.js";
+import { applyProjectStructure } from "./project-structure.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
 
 export type BootstrapPhaseResult =
@@ -26,7 +26,11 @@ export type BootstrapPhaseResult =
     };
 
 export type RunBootstrapPhaseOptions = {
-  onBootstrapStep?: (stepId: string) => void;
+  onProgress?: (event: {
+    status: "start" | "complete";
+    id: string;
+    description: string;
+  }) => void;
   bootstrapRunner?: BootstrapRunner;
   /** Simulate create-next-app output when using a mock runner (standalone topologies). */
   simulateBootstrapOutput?: boolean;
@@ -122,7 +126,18 @@ export async function runBootstrapPhase(
   const steps = resolveBootstrapPlan(config, targetDirectory);
   const bootstrapResult = await runBootstrapPlan(steps, {
     runner: options.bootstrapRunner,
-    onStepStart: (step) => options.onBootstrapStep?.(step.id),
+    onStepStart: (step) =>
+      options.onProgress?.({
+        status: "start",
+        id: step.id,
+        description: step.description,
+      }),
+    onStepComplete: (step) =>
+      options.onProgress?.({
+        status: "complete",
+        id: step.id,
+        description: step.description,
+      }),
   });
 
   if (!bootstrapResult.ok) {
@@ -140,20 +155,59 @@ export async function runBootstrapPhase(
   }
 
   try {
-    applyWorkspacePromotion(config, targetDirectory);
+    options.onProgress?.({
+      status: "start",
+      id: "project-structure",
+      description:
+        config.topology === "monorepo"
+          ? "Configure Turborepo workspace"
+          : "Configure standalone source layout",
+    });
+    applyProjectStructure(config, targetDirectory);
+    options.onProgress?.({
+      status: "complete",
+      id: "project-structure",
+      description:
+        config.topology === "monorepo"
+          ? "Configured Turborepo workspace"
+          : "Configured standalone source layout",
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Workspace promotion failed";
+    const message = error instanceof Error ? error.message : "Project structure setup failed";
     return { ok: false, phase: "workspace", message };
   }
 
   try {
+    options.onProgress?.({
+      status: "start",
+      id: "config",
+      description: "Write CAPTAIN configuration",
+    });
     applyConfigEmit(config, targetDirectory);
+    options.onProgress?.({
+      status: "complete",
+      id: "config",
+      description: "Wrote CAPTAIN configuration",
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Config emit failed";
     return { ok: false, phase: "config", message };
   }
 
-  const recipesResult = applyRecipes(config, targetDirectory);
+  const recipesResult = applyRecipes(config, targetDirectory, {
+    onStepStart: (step) =>
+      options.onProgress?.({
+        status: "start",
+        id: step.id,
+        description: step.description,
+      }),
+    onStepComplete: (step) =>
+      options.onProgress?.({
+        status: "complete",
+        id: step.id,
+        description: step.description,
+      }),
+  });
   if (!recipesResult.ok) {
     return {
       ok: false,
@@ -167,19 +221,34 @@ export async function runBootstrapPhase(
     [
       {
         id: "install-root",
-        description: `Install ${config.packageManager} workspace dependencies`,
+        description: `Install ${config.packageManager} dependencies`,
         command: install.command,
         args: install.args,
         cwd: targetDirectory,
       },
     ],
-    { runner: options.bootstrapRunner },
+    {
+      runner: options.bootstrapRunner,
+      onStepStart: (step) =>
+        options.onProgress?.({
+          status: "start",
+          id: step.id,
+          description: step.description,
+        }),
+      onStepComplete: (step) =>
+        options.onProgress?.({
+          status: "complete",
+          id: step.id,
+          description: step.description,
+        }),
+    },
   );
   if (!installResult.ok) {
+    const details = installResult.stderr.trim();
     return {
       ok: false,
       phase: "install",
-      message: `Root dependency installation failed (exit ${installResult.exitCode})`,
+      message: `Root dependency installation failed (exit ${installResult.exitCode})${details ? `: ${details}` : ""}`,
       bootstrap: installResult,
     };
   }
@@ -191,7 +260,7 @@ export async function runBootstrapPhase(
       ...installResult.completedSteps,
     ],
     appliedRecipes: [
-      "workspace-promote",
+      "project-structure",
       "context-md",
       "env-example",
       "project-json",

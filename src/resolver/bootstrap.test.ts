@@ -15,11 +15,9 @@ const webConfig: NormalizedProjectConfig = {
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
-  modules: ["authorization"],
   locales: ["en", "fr"],
   defaultLocale: "en",
-  validation: "strict",
-  stacks: { hasWeb: true, hasMobile: false, hasDesktop: false },
+  stacks: { hasWeb: true, hasMobile: false },
 };
 
 const monorepoConfig: NormalizedProjectConfig = {
@@ -30,7 +28,7 @@ const monorepoConfig: NormalizedProjectConfig = {
   i18n: { web: "gt-next", mobile: "gt-react-native" },
   ui: { web: "shadcn-base-ui", mobile: "nativewind" },
   runtime: "dev-build",
-  stacks: { hasWeb: true, hasMobile: true, hasDesktop: false },
+  stacks: { hasWeb: true, hasMobile: true },
 };
 
 describe("resolveBootstrapPlan", () => {
@@ -52,14 +50,18 @@ describe("resolveBootstrapPlan", () => {
       runtime: "dev-build",
       i18n: { mobile: "gt-react-native" },
       ui: { mobile: "nativewind" },
-      stacks: { hasWeb: false, hasMobile: true, hasDesktop: false },
+      stacks: { hasWeb: false, hasMobile: true },
     };
 
     const steps = resolveBootstrapPlan(mobileConfig, "/tmp/acme-mobile");
 
     expect(steps).toHaveLength(1);
     expect(steps[0]?.id).toBe("bootstrap-mobile");
+    expect(steps[0]?.description).toBe(
+      "Scaffold Expo Router app (default template)",
+    );
     expect(formatBootstrapCommand(steps[0]!)).toContain("create-expo-app@latest");
+    expect(formatBootstrapCommand(steps[0]!)).toContain("--template default");
   });
 
   it("plans turbo plus nested apps for monorepo", () => {

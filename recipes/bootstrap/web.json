@@ -1,9 +1,0 @@
-{
-  "topology": "web",
-  "description": "Standalone Next.js bootstrap then mini-monorepo promotion",
-  "steps": ["bootstrap-web"],
-  "promotion": {
-    "hoistTo": "apps/web",
-    "packages": ["core", "adapters-next"]
-  }
-}

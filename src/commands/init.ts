@@ -117,6 +117,7 @@ export type InitOptions = GlobalCliOptions & {
   skipSmoke?: boolean;
   /** Test hook: inject bootstrap execution without network access. */
   bootstrapOptions?: RunBootstrapPhaseOptions;
+  onProgress?: RunBootstrapPhaseOptions["onProgress"];
 };
 
 type StagedProjectConfig = {
@@ -175,7 +176,7 @@ async function loadConfig(options: InitOptions): Promise<
     }
   }
 
-  const wizard = await runWizard();
+  const wizard = await runWizard({ yes: options.yes });
   if (wizard.cancelled) {
     return { ok: false, cancelled: true };
   }
@@ -288,7 +289,10 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     execution = await runBootstrapPhase(
       config,
       directory,
-      options.bootstrapOptions,
+      {
+        ...options.bootstrapOptions,
+        onProgress: options.onProgress ?? options.bootstrapOptions?.onProgress,
+      },
     );
   } finally {
     restoreStagedProjectConfig(stagedConfig);
@@ -324,6 +328,18 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   const smoke = await runSmokeValidation(directory, plan.phase3.smoke as SmokeStep[], {
     packageManager: config.packageManager,
     runner: options.smokeRunner,
+    onStepStart: (step) =>
+      options.onProgress?.({
+        status: "start",
+        id: `smoke-${step}`,
+        description: `Run ${step}`,
+      }),
+    onStepComplete: (step) =>
+      options.onProgress?.({
+        status: "complete",
+        id: `smoke-${step}`,
+        description: `Passed ${step}`,
+      }),
   });
 
   if (!smoke.ok) {
@@ -550,6 +566,15 @@ export function registerInitCommand(program: Command): void {
       const result = await runInit({
         ...globals,
         directory,
+        onProgress: !globals.json
+          ? (event) => {
+              if (event.status === "start") {
+                p.log.step(event.description);
+                return;
+              }
+              p.log.success(event.description);
+            }
+          : undefined,
       });
 
       handleInitResult(result, globals.json ?? false);

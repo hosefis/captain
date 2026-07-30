@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CaptainAuthProvider } from "./captain-auth-provider";
+import { CaptainAuthProvider } from "@/integrations/auth/captain-auth-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {

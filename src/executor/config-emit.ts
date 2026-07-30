@@ -13,6 +13,7 @@ function templateVars(config: NormalizedProjectConfig): Record<string, string> {
   return {
     name: config.name,
     scope: config.scope,
+    packageManager: config.packageManager,
     topology: config.topology,
     backend: config.backend,
     auth: config.auth,
@@ -22,9 +23,16 @@ function templateVars(config: NormalizedProjectConfig): Record<string, string> {
     uiMobile,
     locales: config.locales.join(", "),
     defaultLocale: config.defaultLocale,
-    modules: config.modules.join(", "),
     apps: config.apps.join(", "),
     runtime: config.runtime ?? "n/a",
+    authEnvironment:
+      config.auth === "clerk"
+        ? "# Clerk\nNEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\nCLERK_SECRET_KEY="
+        : "# Authentication disabled",
+    i18nEnvironment:
+      config.i18n.web || config.i18n.mobile !== "none"
+        ? `# i18n\nDEFAULT_LOCALE=${config.defaultLocale}`
+        : "# Internationalization disabled",
   };
 }
 
@@ -45,7 +53,9 @@ export function emitEnvExample(config: NormalizedProjectConfig, targetDir: strin
 }
 
 export function emitProjectJson(config: NormalizedProjectConfig, targetDir: string): void {
-  const { stacks: _stacks, ...serializable } = config;
+  const { stacks: _stacks, apps, ...rest } = config;
+  const serializable =
+    config.topology === "monorepo" ? { ...rest, apps } : rest;
   writeFileSync(
     join(targetDir, "project.json"),
     `${JSON.stringify(serializable, null, 2)}\n`,

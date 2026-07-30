@@ -18,7 +18,10 @@ export type PackageManagerDriver = {
 const DRIVERS: Record<PackageManager, PackageManagerDriver> = {
   pnpm: {
     id: "pnpm",
-    install: { command: "pnpm", args: ["install"] },
+    install: {
+      command: "pnpm",
+      args: ["install", "--no-frozen-lockfile", "--force"],
+    },
     lockfile: "pnpm-lock.yaml",
     workspaceRange: "workspace:*",
     emitsPnpmWorkspace: true,

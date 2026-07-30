@@ -19,11 +19,9 @@ const tierAWebConfig: NormalizedProjectConfig = {
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
-  modules: ["authorization"],
   locales: ["en", "fr"],
   defaultLocale: "en",
-  validation: "strict",
-  stacks: { hasWeb: true, hasMobile: false, hasDesktop: false },
+  stacks: { hasWeb: true, hasMobile: false },
 };
 
 const testManifest: DocVersionsManifest = {
@@ -66,7 +64,7 @@ describe("resolvePackagesForConfig", () => {
       apps: ["web", "mobile"],
       i18n: { web: "gt-next", mobile: "gt-react-native" },
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
-      stacks: { hasWeb: true, hasMobile: true, hasDesktop: false },
+      stacks: { hasWeb: true, hasMobile: true },
     });
 
     expect(packages).toContain("create-turbo");

@@ -88,6 +88,8 @@ export async function runSmokeValidation(
   options: {
     packageManager?: PackageManager;
     runner?: SmokeRunner;
+    onStepStart?: (step: SmokeStep) => void;
+    onStepComplete?: (step: SmokeStep) => void;
   } = {},
 ): Promise<SmokeRunResult> {
   const packageManager = options.packageManager ?? "pnpm";
@@ -108,6 +110,7 @@ export async function runSmokeValidation(
     }
 
     const { command, args } = resolveSmokeCommand(step, packageManager);
+    options.onStepStart?.(step);
     const result = await runner(step, command, args, directory);
 
     if (result.exitCode !== 0) {
@@ -122,6 +125,7 @@ export async function runSmokeValidation(
     }
 
     completedSteps.push(step);
+    options.onStepComplete?.(step);
   }
 
   return { ok: true, steps, completedSteps };

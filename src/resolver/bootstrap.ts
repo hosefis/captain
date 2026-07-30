@@ -33,13 +33,14 @@ function nextAppArgs(config: NormalizedProjectConfig, targetDir: string): string
     "--tailwind",
     "--eslint",
     "--app",
+    "--src-dir",
     "--yes",
     useFlag,
   ];
 }
 
 function expoAppArgs(targetDir: string): string[] {
-  return ["create-expo-app@latest", targetDir, "--template", "blank-typescript"];
+  return ["create-expo-app@latest", targetDir, "--template", "default", "--yes"];
 }
 
 function turboArgs(config: NormalizedProjectConfig): string[] {
@@ -103,7 +104,7 @@ export function resolveBootstrapPlan(
     steps.push(
       spawnStep(
         "bootstrap-mobile",
-        "Scaffold Expo app (blank-typescript template)",
+        "Scaffold Expo Router app (default template)",
         config.packageManager,
         expoAppArgs("."),
         targetDirectory,
@@ -144,16 +145,6 @@ export function resolveBootstrapPlan(
         targetDirectory,
       ),
     );
-  }
-
-  if (config.stacks.hasDesktop) {
-    steps.push({
-      id: "bootstrap-apps-desktop",
-      description: "Reserve apps/desktop slot (Electron bootstrap deferred to v1)",
-      command: "(slot)",
-      args: [],
-      cwd: targetDirectory,
-    });
   }
 
   return steps;

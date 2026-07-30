@@ -1,9 +1,0 @@
-{
-  "topology": "mobile",
-  "description": "Standalone Expo bootstrap then mini-monorepo promotion",
-  "steps": ["bootstrap-mobile"],
-  "promotion": {
-    "hoistTo": "apps/mobile",
-    "packages": ["core", "adapters-expo"]
-  }
-}

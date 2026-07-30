@@ -9,7 +9,8 @@ export function buildRecipeVars(config: NormalizedProjectConfig): RecipeVars {
     scope: config.scope,
     scopeName,
     name: config.name,
-    corePackage: `${config.scope}/core`,
+    corePackage:
+      config.topology === "monorepo" ? `${config.scope}/core` : "@/lib",
     adapterNextPackage: `${config.scope}/adapters-next`,
     adapterExpoPackage: `${config.scope}/adapters-expo`,
     adapterDesktopPackage: `${config.scope}/adapters-desktop`,

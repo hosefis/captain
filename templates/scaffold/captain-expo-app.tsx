@@ -1,15 +1,11 @@
-import { StatusBar } from "expo-status-bar";
-import { Text, View } from "react-native";
-import { CaptainAuthProvider } from "./captain-auth-provider";
-import "./global.css";
+import { Stack } from "expo-router";
+import { CaptainAuthProvider } from "@/integrations/auth/captain-auth-provider";
+import "../global.css";
 
-export default function App() {
+export default function RootLayout() {
   return (
     <CaptainAuthProvider>
-      <View className="flex-1 items-center justify-center bg-white">
-        <Text>Welcome to {name}</Text>
-        <StatusBar style="auto" />
-      </View>
+      <Stack />
     </CaptainAuthProvider>
   );
 }

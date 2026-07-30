@@ -2,236 +2,96 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
+import { parseProjectConfig } from "../schema/project-config.js";
+import { applyProjectStructure } from "./project-structure.js";
 import { applyRecipes } from "./apply-recipes.js";
-import { applyWorkspacePromotion } from "./workspace-promote.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
-const webConfig: NormalizedProjectConfig = {
-  name: "acme-web",
+function tempDir(label: string): string {
+  const directory = join(
+    tmpdir(),
+    `captain-recipes-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    join(directory, "package.json"),
+    `${JSON.stringify({ name: label, scripts: {} }, null, 2)}\n`,
+  );
+  return directory;
+}
+
+const base = {
+  name: "acme",
   scope: "@acme",
   packageManager: "pnpm",
-  topology: "web",
-  apps: ["web"],
   backend: "rest",
-  auth: "clerk",
-  i18n: { web: "gt-next" },
-  ui: { web: "shadcn-base-ui" },
-  modules: ["authorization"],
-  locales: ["en", "fr"],
+  locales: ["en"],
   defaultLocale: "en",
-  validation: "strict",
-  stacks: { hasWeb: true, hasMobile: false, hasDesktop: false },
-};
+} as const;
 
-function makeTempDir(): string {
-  const dir = join(tmpdir(), `captain-recipes-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
+describe("standalone recipes", () => {
+  it("emits Next.js code into framework-native src directories", () => {
+    const config = parseProjectConfig({
+      ...base,
+      topology: "web",
+      auth: "clerk",
+      i18n: "gt-next",
+      ui: "shadcn-base-ui",
+    });
+    const directory = tempDir("web");
+    applyProjectStructure(config, directory);
 
-function seedWebWorkspace(targetDir: string): void {
-  mkdirSync(join(targetDir, "apps", "web"), { recursive: true });
-  writeFileSync(
-    join(targetDir, "apps", "web", "package.json"),
-    JSON.stringify({ name: "temp-next", scripts: { dev: "next dev" } }, null, 2),
-  );
-  writeFileSync(join(targetDir, "package.json"), JSON.stringify({ name: "acme-web", private: true }, null, 2));
-}
-
-describe("applyRecipes", () => {
-  it("emits Tier A web modules and adapters", () => {
-    const targetDir = makeTempDir();
-    seedWebWorkspace(targetDir);
-    applyWorkspacePromotion(webConfig, targetDir);
-
-    const result = applyRecipes(webConfig, targetDir);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-
-    expect(result.appliedRecipes).toEqual([
-      "backend-rest",
-      "module-authorization",
-      "auth-clerk",
-      "i18n-web-gt-next",
-      "i18n-enforcement",
-      "ui-web-shadcn-base-ui",
-    ]);
-
-    const coreIndex = readFileSync(join(targetDir, "packages", "core", "src", "index.ts"), "utf-8");
-    expect(coreIndex).toContain("createHttpClient");
-    expect(coreIndex).toContain("authorize");
-    expect(coreIndex).toContain("createInMemoryAuthorizationAdapter");
-
-    const adapterIndex = readFileSync(
-      join(targetDir, "packages", "adapters-next", "src", "index.ts"),
-      "utf-8",
-    );
-    expect(adapterIndex).toContain("createRestBackendClient");
-    expect(adapterIndex).toContain("clerkAuthConfig");
-    expect(adapterIndex).toContain("gtNextConfig");
-    expect(adapterIndex).toContain("shadcnBaseUiConfig");
-
-    expect(existsSync(join(targetDir, "tools", "i18n", "i18n-check.mjs"))).toBe(true);
-    expect(existsSync(join(targetDir, "apps", "web", "proxy.ts"))).toBe(true);
-    expect(
-      existsSync(
-        join(
-          targetDir,
-          "apps",
-          "web",
-          "app",
-          "captain-auth-provider.tsx",
-        ),
-      ),
-    ).toBe(true);
-    expect(
-      readFileSync(
-        join(targetDir, "apps", "web", "app", "captain-auth-provider.tsx"),
-        "utf8",
-      ),
-    ).toContain("if (!publishableKey)");
-    expect(existsSync(join(targetDir, "apps", "web", "components.json"))).toBe(
-      true,
-    );
-
-    const rootPkg = JSON.parse(readFileSync(join(targetDir, "package.json"), "utf-8")) as {
-      scripts: Record<string, string>;
-    };
-    expect(rootPkg.scripts["i18n:check"]).toContain("tools/i18n/i18n-check.mjs");
-    expect(rootPkg.scripts["i18n:check"]).not.toContain("CAPTAIN_LOCALES=");
-
-    const webPkg = JSON.parse(
-      readFileSync(join(targetDir, "apps", "web", "package.json"), "utf8"),
+    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(existsSync(join(directory, "src/lib/backend/client.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/features/authorization/types.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/integrations/auth/clerk.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/app/layout.tsx"))).toBe(true);
+    expect(existsSync(join(directory, "turbo.json"))).toBe(false);
+    expect(existsSync(join(directory, "packages"))).toBe(false);
+    const packageJson = JSON.parse(
+      readFileSync(join(directory, "package.json"), "utf-8"),
     ) as { dependencies: Record<string, string> };
-    expect(webPkg.dependencies["@clerk/nextjs"]).toBe("^6.22.0");
+    expect(packageJson.dependencies["@clerk/nextjs"]).toBe("^6.22.0");
   });
 
-  it("emits Tier A mobile modules and adapters", () => {
-    const mobileConfig: NormalizedProjectConfig = {
-      ...webConfig,
-      name: "acme-mobile",
+  it("adds Clerk's Expo runtime dependencies before installation", () => {
+    const config = parseProjectConfig({
+      ...base,
       topology: "mobile",
-      apps: ["mobile"],
-      i18n: { mobile: "gt-react-native" },
-      ui: { mobile: "nativewind" },
       runtime: "dev-build",
-      stacks: { hasWeb: false, hasMobile: true, hasDesktop: false },
-    };
+      auth: "clerk",
+      i18n: "gt-react-native",
+      ui: "nativewind",
+    });
+    const directory = tempDir("mobile-clerk");
+    applyProjectStructure(config, directory);
 
-    const targetDir = makeTempDir();
-    mkdirSync(join(targetDir, "apps", "mobile"), { recursive: true });
-    writeFileSync(
-      join(targetDir, "apps", "mobile", "package.json"),
-      JSON.stringify({ name: "temp-expo", scripts: { start: "expo start" } }, null, 2),
-    );
-    writeFileSync(join(targetDir, "package.json"), JSON.stringify({ name: "acme-mobile", private: true }, null, 2));
-    applyWorkspacePromotion(mobileConfig, targetDir);
-
-    const result = applyRecipes(mobileConfig, targetDir);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-
-    expect(result.appliedRecipes).toContain("i18n-mobile-gt-react-native");
-    expect(result.appliedRecipes).toContain("expo-localization");
-    expect(result.appliedRecipes).toContain("ui-mobile-nativewind");
-
-    const adapterIndex = readFileSync(
-      join(targetDir, "packages", "adapters-expo", "src", "index.ts"),
-      "utf-8",
-    );
-    expect(adapterIndex).toContain("gtReactNativeConfig");
-    expect(adapterIndex).toContain("nativeWindConfig");
-    expect(
-      existsSync(join(targetDir, "apps", "mobile", "metro.config.js")),
-    ).toBe(true);
-    expect(
-      existsSync(join(targetDir, "apps", "mobile", "global.css")),
-    ).toBe(true);
-    expect(
-      existsSync(
-        join(targetDir, "apps", "mobile", "captain-auth-provider.tsx"),
-      ),
-    ).toBe(true);
-
-    const mobilePkg = JSON.parse(
-      readFileSync(join(targetDir, "apps", "mobile", "package.json"), "utf8"),
+    expect(applyRecipes(config, directory).ok).toBe(true);
+    const packageJson = JSON.parse(
+      readFileSync(join(directory, "package.json"), "utf-8"),
     ) as { dependencies: Record<string, string> };
-    expect(mobilePkg.dependencies.nativewind).toBe("^4.1.23");
+    expect(packageJson.dependencies["@clerk/expo"]).toBe("^2.11.0");
+    expect(packageJson.dependencies["expo-secure-store"]).toBe("^14.2.3");
   });
 
-  it("emits admin-catalog module on init", () => {
-    const targetDir = makeTempDir();
-    seedWebWorkspace(targetDir);
-    applyWorkspacePromotion(webConfig, targetDir);
+  it("supports Expo Go with no i18n and no authentication", () => {
+    const config = parseProjectConfig({
+      ...base,
+      topology: "mobile",
+      runtime: "expo-go",
+      auth: "none",
+      i18n: "none",
+      ui: "nativewind",
+    });
+    const directory = tempDir("mobile");
+    applyProjectStructure(config, directory);
 
-    const catalogConfig: NormalizedProjectConfig = {
-      ...webConfig,
-      modules: ["authorization", "admin-catalog"],
-    };
-
-    const result = applyRecipes(catalogConfig, targetDir);
-
+    const result = applyRecipes(config, directory);
     expect(result.ok).toBe(true);
-    if (!result.ok) {
-      return;
-    }
-
-    expect(result.appliedRecipes).toContain("module-admin-catalog");
-
-    const coreIndex = readFileSync(join(targetDir, "packages", "core", "src", "index.ts"), "utf-8");
-    expect(coreIndex).toContain("createAdminCatalogDriver");
-
-    expect(
-      existsSync(join(targetDir, "packages", "core", "src", "admin-catalog", "driver.ts")),
-    ).toBe(true);
+    expect(existsSync(join(directory, "src/features/authorization"))).toBe(false);
+    expect(existsSync(join(directory, "src/integrations/auth"))).toBe(false);
+    expect(existsSync(join(directory, "src/integrations/i18n"))).toBe(false);
+    expect(readFileSync(join(directory, "src/app/_layout.tsx"), "utf-8")).toContain(
+      "<Stack />",
+    );
   });
-
-  it("emits form-wizard with its React package contract", () => {
-    const targetDir = makeTempDir();
-    seedWebWorkspace(targetDir);
-    applyWorkspacePromotion(webConfig, targetDir);
-
-    const result = applyRecipes(
-      { ...webConfig, modules: ["authorization", "form-wizard"] },
-      targetDir,
-    );
-
-    expect(result.ok).toBe(true);
-    const coreIndex = readFileSync(
-      join(targetDir, "packages", "core", "src", "index.ts"),
-      "utf8",
-    );
-    expect(coreIndex).toContain("createFormWizard");
-    expect(coreIndex).toContain("useFormWizard");
-    const corePackage = JSON.parse(
-      readFileSync(join(targetDir, "packages", "core", "package.json"), "utf8"),
-    ) as { peerDependencies: Record<string, string> };
-    expect(corePackage.peerDependencies.react).toBe("^19.1.0");
-  });
-
-  it("emits the user-identity API and in-memory adapter", () => {
-    const targetDir = makeTempDir();
-    seedWebWorkspace(targetDir);
-    applyWorkspacePromotion(webConfig, targetDir);
-
-    const result = applyRecipes(
-      { ...webConfig, modules: ["authorization", "user-identity"] },
-      targetDir,
-    );
-
-    expect(result.ok).toBe(true);
-    const coreIndex = readFileSync(
-      join(targetDir, "packages", "core", "src", "index.ts"),
-      "utf8",
-    );
-    expect(coreIndex).toContain("createUserIdentity");
-    expect(coreIndex).toContain("createInMemoryUserIdentityAdapter");
-  });
-
 });

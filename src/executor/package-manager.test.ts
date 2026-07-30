@@ -3,7 +3,15 @@ import { resolvePackageManagerDriver } from "./package-manager.js";
 
 describe("package manager drivers", () => {
   it.each([
-    ["pnpm", "pnpm", ["install"], "pnpm-lock.yaml", "workspace:*", true, "pnpm@9.15.9"],
+    [
+      "pnpm",
+      "pnpm",
+      ["install", "--no-frozen-lockfile", "--force"],
+      "pnpm-lock.yaml",
+      "workspace:*",
+      true,
+      "pnpm@9.15.9",
+    ],
     ["npm", "npm", ["install"], "package-lock.json", "*", false, "npm@10.9.2"],
     ["bun", "bun", ["install"], "bun.lock", "workspace:*", false, "bun@1.2.5"],
   ] as const)(

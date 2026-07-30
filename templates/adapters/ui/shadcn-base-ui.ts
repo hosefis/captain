@@ -6,7 +6,7 @@ export const shadcnBaseUiConfig = {
   style: "base-vega",
   tailwind: {
     config: "tailwind.config.ts",
-    css: "app/globals.css",
+    css: "src/app/globals.css",
   },
   aliases: {
     components: "@/components",
