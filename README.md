@@ -1,74 +1,135 @@
 # create-captain
 
-> *"With great scaffolding comes great maintainability."*
+CAPTAIN (**C**reate **A**pps **P**roperly — **T**emplates, **A**dapters,
+**I**ntegrations, **N**ow) is an interactive CLI for creating owned Next.js,
+Expo, and Turborepo projects.
 
-CAPTAIN — **C**reate **A**pps **P**roperly: **T**emplates, **A**dapters,
-**I**ntegrations, **N**ow — generates owned Next.js, Expo, and Turborepo
-projects. Generated applications do not depend on the CAPTAIN CLI at runtime.
-
-This is not
-[`create-captain-app`](https://www.npmjs.com/package/create-captain-app), which
-targets Electron. Invoke this generator as `create-captain`.
+Standalone projects remain normal framework projects. A monorepo is created
+only when you explicitly choose the monorepo project type.
 
 ## Requirements
 
 - Node.js 22 or newer
-- pnpm, npm, or Bun when selecting that package manager
-- A Clerk application for generated authentication credentials
+- pnpm, npm, or Bun
 
-## Quick start
+## Create a project
 
-Bare invocation and explicit `init` are equivalent:
+Run the interactive wizard:
 
 ```bash
 pnpm dlx create-captain@latest my-app
-pnpm dlx create-captain@latest init my-app
-
 npx create-captain@latest my-app
 bunx create-captain@latest my-app
 ```
 
-Without `--config`, CAPTAIN opens the interactive wizard. For repeatable agent
-or CI runs, pass a configuration file:
+The `init` command is optional:
+
+```bash
+create-captain init my-app
+```
+
+When the directory argument is omitted, CAPTAIN creates a directory using the
+project name from the wizard or config file. Pass `.` explicitly to generate in
+the current directory.
+
+The wizard asks trajectory-changing questions first:
+
+1. Project name
+2. Package manager
+3. Project type
+4. Expo runtime when the project contains mobile
+5. Authentication
+6. Compatible follow-up settings
+7. Locales when internationalization is enabled
+8. Final configuration review
+
+Choices that have only one supported answer are resolved automatically and
+shown in the final review. Later questions are filtered using earlier answers.
+For example, Expo Go disables mobile internationalization, while an Expo
+development build uses GT React Native.
+
+## Current project types
+
+| Project type | Generated structure |
+|---|---|
+| Web | Standalone Next.js App Router project using `src/` |
+| Mobile | Standalone Expo Router project using `src/` |
+| Monorepo | Turborepo with `apps/web`, `apps/mobile`, and shared packages |
+
+Standalone application code follows the framework-native layout:
+
+```text
+src/
+  app/
+  components/
+  features/
+  lib/
+  integrations/
+```
+
+The project root keeps framework configuration, dependency manifests, public
+assets, and generated CAPTAIN context files.
+
+## Supported stack
+
+- REST backend client
+- Clerk or no authentication
+- Authorization when Clerk is enabled
+- GT for Next.js
+- GT React Native for Expo development builds
+- No mobile internationalization for Expo Go
+- shadcn with Base UI for web
+- NativeWind for mobile
+- pnpm, npm, and Bun
+
+Only implemented values are accepted by the wizard and JSON schema. Planned
+integrations are tracked in [ROADMAP.md](ROADMAP.md).
+
+## Config-file usage
+
+Use `--config` for repeatable or agent-driven generation:
 
 ```bash
 create-captain my-app --config ./project.json --yes
 create-captain my-app --config ./project.json --dry-run --json
 ```
 
-`--dry-run` performs schema and compatibility validation and returns the
-complete planned bootstrap, recipe, and smoke steps without writing. JSON mode
-uses a status envelope such as `dry_run`, `success`, `blocked`,
-`execution_failed`, or `smoke_failed` and exits non-zero for failures.
+Standalone web example:
 
-## Commands
-
-| Command | Purpose | Command options |
-| --- | --- | --- |
-| `[init] [directory]` | Generate a web, mobile, or monorepo project | Uses `--config` or the wizard |
-| `add-module <module>` | Add `admin-catalog`, `form-wizard`, or `user-identity` | `--project <path>` |
-| `scaffold:catalog <resource>` | Generate typed catalog config, routes, server wiring, and locale files | `--fields <list>`, `--archive`, `--project <path>` |
-| `migrate:to-monorepo` | Convert a standalone project while preserving existing apps and packages | `--add web\|mobile`, `--project <path>` |
-
-```bash
-create-captain add-module form-wizard
-create-captain scaffold:catalog billing-types \
-  --fields name:string,description:string,active:boolean --archive
-create-captain migrate:to-monorepo --add mobile
+```json
+{
+  "name": "acme-web",
+  "scope": "@acme",
+  "packageManager": "pnpm",
+  "topology": "web",
+  "backend": "rest",
+  "auth": "clerk",
+  "i18n": "gt-next",
+  "ui": "shadcn-base-ui",
+  "locales": ["en", "fr"],
+  "defaultLocale": "en"
+}
 ```
 
-Global execution flags apply consistently:
+Expo Go example:
 
-| Flag | Behavior |
-| --- | --- |
-| `--config <path>` | Read init configuration from JSON |
-| `--yes` | Skip warning confirmations |
-| `--dry-run` | Validate and serialize the operation without applying it |
-| `--json` | Emit machine-readable status output |
-| `--force` | Authorize only the replacements listed by preflight |
-| `--verify-docs` | Compare bundled dependency ranges with npm metadata |
+```json
+{
+  "name": "acme-mobile",
+  "scope": "@acme",
+  "packageManager": "pnpm",
+  "topology": "mobile",
+  "runtime": "expo-go",
+  "backend": "rest",
+  "auth": "none",
+  "i18n": "none",
+  "ui": "nativewind",
+  "locales": ["en"],
+  "defaultLocale": "en"
+}
+```
 
-## Project configuration
+Monorepo example:
 
 ```json
 {
@@ -77,6 +138,7 @@ Global execution flags apply consistently:
   "packageManager": "pnpm",
   "topology": "monorepo",
   "apps": ["web", "mobile"],
+  "runtime": "dev-build",
   "backend": "rest",
   "auth": "clerk",
   "i18n": {
@@ -87,90 +149,46 @@ Global execution flags apply consistently:
     "web": "shadcn-base-ui",
     "mobile": "nativewind"
   },
-  "modules": [
-    "authorization",
-    "admin-catalog",
-    "form-wizard",
-    "user-identity"
-  ],
-  "runtime": "dev-build",
   "locales": ["en", "fr"],
-  "defaultLocale": "en",
-  "validation": "strict"
+  "defaultLocale": "en"
 }
 ```
 
-See [`SPEC.md`](SPEC.md) for the schema and compatibility rules and
-[`docs/glossary.md`](docs/glossary.md) for domain terminology. Legacy
-configuration containing `payment` is rejected with a link to the standalone
-[future payment release specification](docs/specs/payment-release.md).
+## Options
 
-## Supported release surface
+| Option | Purpose |
+|---|---|
+| `--config <path>` | Load a JSON project configuration |
+| `--yes` | Skip the final interactive confirmation |
+| `--dry-run` | Validate and print the complete plan without writing |
+| `--json` | Emit machine-readable final output without spinners |
+| `--verify-docs` | Check selected package versions against tested versions |
 
-| Capability | Supported |
-| --- | --- |
-| Topology | Next.js web, Expo mobile dev-build, web/mobile Turborepo |
-| Package manager | pnpm, npm, Bun |
-| Backend | REST adapter |
-| Authentication | Clerk |
-| Internationalization | GT Next, GT React Native, Expo Localization |
-| UI | shadcn/Base UI, NativeWind |
-| Modules | Authorization, AdminCatalog, FormWizard, User Identity |
-| Follow-up generation | Optional modules, catalog resources, monorepo migration |
+## How generation works
 
-Convex, Supabase, Firebase, Better Auth, WorkOS, next-intl, Radix-based shadcn,
-React Native Paper, Expo Go, desktop, and payment remain explicit compatibility
-blocks. The authoritative boundary is
-[ADR 0001](docs/adr/0001-tier-a-release-scope.md).
+CAPTAIN validates the resolved configuration before touching the target. It
+then runs the official framework scaffold, creates the selected standalone or
+monorepo structure, applies supported integrations, installs dependencies, and
+runs smoke validation.
 
-## Workspace and package-manager behavior
+Human runs show live progress for each scaffold, generation, installation, and
+validation step. Command output is captured and displayed when a step fails.
+JSON mode suppresses interactive progress and returns a single status envelope.
 
-All generated projects declare `package.json` workspaces and Turbo-backed root
-`dev`, `build`, `lint`, and `typecheck` tasks. CAPTAIN finalizes every manifest
-before running one root install.
+Generated projects include:
 
-| Manager | Workspace range | Manager-specific metadata |
-| --- | --- | --- |
-| pnpm | `workspace:*` | Emits `pnpm-workspace.yaml` and `pnpm-lock.yaml` |
-| npm | `*` | Uses package workspaces and `package-lock.json` |
-| Bun | `workspace:*` | Uses package workspaces and `bun.lock` |
+- `project.json` with the resolved configuration
+- `CONTEXT.md` with the generated stack and layout
+- `.env.example` containing only relevant integration variables
 
-Smoke validation invokes scripts through the selected package manager, so no
-generated command relies on POSIX-only environment assignment.
-
-## Collision policy
-
-Commands preflight their intended targets before CAPTAIN writes generated
-files. An unsafe existing path aborts the operation and identifies the
-collision. `--force` permits only the replacements already present in that
-plan; it does not add new targets. Dry runs never write.
-
-`add-module` preserves unrelated modules and refuses to replace an edited core
-export index unless forced. Catalog scaffolding refuses duplicate resources.
-Monorepo migration preserves existing app source and applies integration
-recipes only to a newly requested app. Keep application code in source control
-and review every forced plan before applying it.
-
-## Development and release validation
+## Develop CAPTAIN
 
 ```bash
 pnpm install
 pnpm typecheck
-pnpm lint
 pnpm test
-pnpm test:matrix
 pnpm build
 ```
 
-Pull requests run the generator checks, a deterministic pnpm/npm/Bun ×
-web/mobile/monorepo fixture matrix, and a live pnpm/web canary. Nightly and
-release-triggered workflows exercise the complete live 3×3 matrix and retain
-the generated project when a case fails.
-
-When changing a recipe, update its generated-file contract test and dependency
-range together. Architecture, generated-file ownership, version policy, and CI
-policy are recorded in [`docs/adr`](docs/adr).
-
-## License
-
-MIT — see [`LICENSE`](LICENSE).
+The test suite covers supported package managers across standalone web,
+standalone mobile, and explicit web-plus-mobile monorepo generation.

@@ -1,20 +1,18 @@
 # CAPTAIN glossary
 
-- **Adapter:** Framework- or provider-specific implementation of a core
+- **Adapter:** Framework- or provider-specific implementation of a shared
   contract.
-- **App:** A runnable web, mobile, or future desktop workspace.
-- **Compatibility block:** A preflight error preventing an unsupported
-  configuration from mutating the target.
-- **Generated-code ownership:** The rule that emitted source belongs to the
-  target project and cannot be silently overwritten by later CAPTAIN commands.
-- **Module:** An optional, provider-independent capability emitted into core.
-- **Operation plan:** Ordered file and command operations resolved and checked
-  before application.
-- **Recipe:** Deterministic logic that emits a module, adapter, integration, or
-  configuration change.
+- **App:** A runnable Next.js or Expo application.
+- **Integration:** Generated wiring for a supported backend, authentication,
+  internationalization, or UI provider.
+- **Monorepo:** An explicitly selected Turborepo containing web and mobile apps
+  plus shared packages.
+- **Progressive disclosure:** Asking trajectory-changing questions first and
+  filtering later choices using earlier answers.
+- **Recipe:** Deterministic generation logic for a supported capability.
 - **Smoke validation:** Generated-project typecheck and lint, plus build in
-  agent mode.
-- **Tier A:** The combinations CAPTAIN guarantees will generate, install, and
-  pass smoke validation.
-- **Topology:** Web, mobile, or a monorepo containing one or more apps.
-- **Workspace:** The generated root containing `apps/*` and `packages/*`.
+  config-file mode.
+- **Standalone:** A framework-native project root without workspace or Turbo
+  metadata.
+- **Supported option registry:** The single list of completed choices used by
+  both the schema and interactive wizard.

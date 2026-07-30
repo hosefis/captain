@@ -1,18 +1,18 @@
 # ADR 0002: Package-manager support
 
 - Status: Accepted
-- Date: 2026-07-28
+- Date: 2026-07-30
 
 ## Decision
 
-pnpm, npm, and Bun are first-class generated-project package managers. CAPTAIN
-uses a package-manager driver for bootstrap flags, workspace metadata,
-installation, script execution, and lockfile expectations.
+CAPTAIN supports pnpm, npm, and Bun.
 
-All generated workspaces declare `workspaces` in `package.json`. Only pnpm
-projects additionally receive `pnpm-workspace.yaml`.
+Standalone projects retain the selected framework's root manifest and lockfile.
+Only explicit monorepos receive workspace metadata, Turbo scripts, shared
+package ranges, and `pnpm-workspace.yaml` when pnpm is selected.
 
 ## Consequences
 
-Each package manager is tested across web, mobile, and monorepo topologies.
-Package-manager-specific shell fragments must not leak into shared templates.
+Bootstrap, dependency installation, and smoke commands use the selected
+package-manager driver. The generated-project test matrix covers every package
+manager across web, mobile, and monorepo project types.
