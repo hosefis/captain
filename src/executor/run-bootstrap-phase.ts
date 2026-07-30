@@ -126,10 +126,11 @@ export async function runBootstrapPhase(
   });
 
   if (!bootstrapResult.ok) {
+    const details = bootstrapResult.stderr.trim();
     return {
       ok: false,
       phase: "bootstrap",
-      message: `Bootstrap step "${bootstrapResult.failedStep.id}" failed (exit ${bootstrapResult.exitCode})`,
+      message: `Bootstrap step "${bootstrapResult.failedStep.id}" failed (exit ${bootstrapResult.exitCode})${details ? `: ${details}` : ""}`,
       bootstrap: bootstrapResult,
     };
   }

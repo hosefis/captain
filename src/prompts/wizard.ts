@@ -27,9 +27,8 @@ function cancelIfNeeded<T>(value: T | symbol): value is symbol {
   return false;
 }
 
-function normalizeScopeInput(input: string): string {
-  const trimmed = input.trim();
-  return trimmed.startsWith("@") ? trimmed : `@${trimmed}`;
+export function deriveScopeFromProjectName(name: string): string {
+  return `@${name.trim().toLowerCase()}`;
 }
 
 const PACKAGE_MANAGER_OPTIONS: Array<{ value: PackageManager; label: string }> = [
@@ -115,22 +114,6 @@ export async function runWizard(): Promise<WizardResult> {
     },
   });
   if (cancelIfNeeded(name)) {
-    return { cancelled: true };
-  }
-
-  const scopeInput = await p.text({
-    message: "npm scope for packages",
-    placeholder: "@acme",
-    initialValue: "@acme",
-    validate: (value) => {
-      const scope = normalizeScopeInput(value);
-      if (!/^@[a-z0-9-]+$/i.test(scope)) {
-        return "Scope must look like @acme";
-      }
-      return undefined;
-    },
-  });
-  if (cancelIfNeeded(scopeInput)) {
     return { cancelled: true };
   }
 
@@ -349,7 +332,7 @@ export async function runWizard(): Promise<WizardResult> {
 
   const config = parseProjectConfig({
     name: (name as string).trim(),
-    scope: normalizeScopeInput(scopeInput as string),
+    scope: deriveScopeFromProjectName(name as string),
     packageManager: packageManager as PackageManager,
     topology: topology as Topology,
     apps,

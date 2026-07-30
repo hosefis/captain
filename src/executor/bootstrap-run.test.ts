@@ -64,4 +64,24 @@ describe("runBootstrapPlan", () => {
       expect(result.stderr).toContain("spawn failed");
     }
   });
+
+  it("captures readable stderr from the real child process", async () => {
+    const result = await runBootstrapPlan([
+      {
+        ...sampleStep,
+        command: process.execPath,
+        args: [
+          "-e",
+          "console.error('visible bootstrap failure'); process.exit(1)",
+        ],
+        cwd: process.cwd(),
+      },
+    ]);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.stderr).toContain("visible bootstrap failure");
+      expect(result.stderr).not.toContain("[object Object]");
+    }
+  });
 });

@@ -69,22 +69,16 @@ async function defaultSmokeRunner(
   args: string[],
   cwd: string,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const child = execa(command, args, {
+  const result = await execa(command, args, {
     cwd,
     stdio: ["ignore", "pipe", "pipe"],
     reject: false,
   });
 
-  const [stdout, stderr] = await Promise.all([
-    child.stdout ?? Promise.resolve(""),
-    child.stderr ?? Promise.resolve(""),
-  ]);
-
-  const result = await child;
   return {
     exitCode: result.exitCode ?? 1,
-    stdout: String(stdout),
-    stderr: String(stderr),
+    stdout: String(result.stdout ?? ""),
+    stderr: String(result.stderr ?? ""),
   };
 }
 

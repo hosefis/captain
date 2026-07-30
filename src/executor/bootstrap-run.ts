@@ -21,22 +21,16 @@ async function defaultRunner(
     return { exitCode: 0, stdout: "", stderr: "" };
   }
 
-  const child = execa(step.command, step.args, {
+  const result = await execa(step.command, step.args, {
     cwd: step.cwd,
     stdio: ["ignore", "pipe", "pipe"],
     reject: false,
   });
 
-  const [stdout, stderr] = await Promise.all([
-    child.stdout ?? Promise.resolve(""),
-    child.stderr ?? Promise.resolve(""),
-  ]);
-
-  const result = await child;
   return {
     exitCode: result.exitCode ?? 1,
-    stdout: String(stdout),
-    stderr: String(stderr),
+    stdout: String(result.stdout ?? ""),
+    stderr: String(result.stderr ?? ""),
   };
 }
 

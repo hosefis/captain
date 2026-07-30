@@ -1,4 +1,5 @@
-import { resolve } from "node:path";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
 import * as p from "@clack/prompts";
 import type { GlobalCliOptions } from "../cli-options.js";
 import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
@@ -107,7 +108,7 @@ export type InitResult =
     };
 
 export type InitOptions = GlobalCliOptions & {
-  directory: string;
+  directory?: string;
   /** Test hook: mock npm registry lookups for --verify-docs */
   npmFetch?: NpmFetch;
   /** Test hook: mock Phase 3 smoke runner */
@@ -117,6 +118,42 @@ export type InitOptions = GlobalCliOptions & {
   /** Test hook: inject bootstrap execution without network access. */
   bootstrapOptions?: RunBootstrapPhaseOptions;
 };
+
+type StagedProjectConfig = {
+  path: string;
+  contents: string;
+};
+
+function stageProjectConfigForBootstrap(
+  configPath: string | undefined,
+  targetDirectory: string,
+): StagedProjectConfig | undefined {
+  if (!configPath) {
+    return undefined;
+  }
+
+  const absoluteConfigPath = resolve(configPath);
+  if (
+    basename(absoluteConfigPath).toLowerCase() !== "project.json" ||
+    dirname(absoluteConfigPath) !== targetDirectory ||
+    !existsSync(absoluteConfigPath)
+  ) {
+    return undefined;
+  }
+
+  const staged = {
+    path: absoluteConfigPath,
+    contents: readFileSync(absoluteConfigPath, "utf8"),
+  };
+  unlinkSync(absoluteConfigPath);
+  return staged;
+}
+
+function restoreStagedProjectConfig(staged: StagedProjectConfig | undefined): void {
+  if (staged && !existsSync(staged.path)) {
+    writeFileSync(staged.path, staged.contents, "utf8");
+  }
+}
 
 function isAgentMode(options: InitOptions): boolean {
   return Boolean(options.config);
@@ -209,7 +246,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   }
 
   const config = loaded.config;
-  const directory = resolve(options.directory);
+  const directory = resolve(options.directory ?? config.name);
   const agentMode = isAgentMode(options);
 
   const compatibility = resolveCompatibility(config, {
@@ -245,11 +282,17 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { status: "dry_run", config, compatibility, plan, verifyDocs };
   }
 
-  const execution = await runBootstrapPhase(
-    config,
-    directory,
-    options.bootstrapOptions,
-  );
+  const stagedConfig = stageProjectConfigForBootstrap(options.config, directory);
+  let execution;
+  try {
+    execution = await runBootstrapPhase(
+      config,
+      directory,
+      options.bootstrapOptions,
+    );
+  } finally {
+    restoreStagedProjectConfig(stagedConfig);
+  }
 
   if (!execution.ok) {
     return {
@@ -500,8 +543,8 @@ export function registerInitCommand(program: Command): void {
   program
     .command("init", { isDefault: true })
     .description("Scaffold a new CAPTAIN project")
-    .argument("[directory]", "Target directory", ".")
-    .action(async (directory: string, _options: unknown, command: Command) => {
+    .argument("[directory]", "Target directory")
+    .action(async (directory: string | undefined, _options: unknown, command: Command) => {
       const globals = getGlobalOptions(command);
 
       const result = await runInit({

@@ -46,7 +46,6 @@ describe("applyWorkspacePromotion", () => {
         workspaces: string[];
         scripts: Record<string, string>;
         packageManager: string;
-        pnpm?: { onlyBuiltDependencies?: string[] };
       };
       expect(root.workspaces).toEqual(["apps/*", "packages/*"]);
       expect(root.packageManager).toMatch(
@@ -61,12 +60,6 @@ describe("applyWorkspacePromotion", () => {
           readFileSync(join(targetDir, "pnpm-workspace.yaml"), "utf8"),
         ).toContain('  "sharp": true');
       }
-      expect(root.pnpm?.onlyBuiltDependencies).toEqual(
-        packageManager === "pnpm"
-          ? ["@clerk/shared", "esbuild", "msw", "sharp", "unrs-resolver"]
-          : undefined,
-      );
-
       const adapter = JSON.parse(
         readFileSync(
           join(targetDir, "packages/adapters-next/package.json"),
@@ -87,11 +80,15 @@ describe("applyWorkspacePromotion", () => {
       JSON.stringify({ name: "temp-next", scripts: { dev: "next dev" } }),
     );
     mkdirSync(join(targetDir, "app"), { recursive: true });
+    mkdirSync(join(targetDir, "node_modules"), { recursive: true });
+    writeFileSync(join(targetDir, "pnpm-lock.yaml"), "stale lockfile");
     writeFileSync(join(targetDir, "app", "page.tsx"), "export default function Page() { return null; }");
 
     applyWorkspacePromotion(webConfig, targetDir);
 
     expect(readFileSync(join(targetDir, "pnpm-workspace.yaml"), "utf-8")).toContain("packages/*");
+    expect(existsSync(join(targetDir, "node_modules"))).toBe(false);
+    expect(existsSync(join(targetDir, "pnpm-lock.yaml"))).toBe(false);
     expect(readFileSync(join(targetDir, "apps/web/package.json"), "utf-8")).toContain("@acme/web");
     expect(readFileSync(join(targetDir, "packages/core/package.json"), "utf-8")).toContain("@acme/core");
     expect(readFileSync(join(targetDir, "packages/adapters-next/package.json"), "utf-8")).toContain(

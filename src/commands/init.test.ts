@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -38,6 +38,23 @@ describe("runInit", () => {
       true,
     );
     expect(result.plan.phase3.smoke).toEqual(["typecheck", "lint", "build"]);
+  });
+
+  it("uses the configured project name when no target directory is provided", async () => {
+    const result = await runInit({
+      config: join(fixturesDir, "project-web.json"),
+      yes: true,
+      dryRun: true,
+      json: false,
+      verifyDocs: false,
+    });
+
+    expect(result.status).toBe("dry_run");
+    if (result.status === "dry_run") {
+      expect(result.plan.phase1.bootstrap[0]?.cwd).toBe(
+        join(process.cwd(), "acme-web"),
+      );
+    }
   });
 
   it("blocks convex backend in agent mode", async () => {
@@ -149,6 +166,66 @@ describe("runInit", () => {
         completedSteps: ["typecheck", "lint", "build"],
       });
     }
+  });
+
+  it("bootstraps when project.json is inside the target directory", async () => {
+    const directory = makeTempDir("in-target-config");
+    const configPath = join(directory, "project.json");
+    const originalConfig = readFileSync(join(fixturesDir, "project-web.json"), "utf8");
+    writeFileSync(configPath, originalConfig);
+
+    let configWasStaged = false;
+    const result = await runInit({
+      directory,
+      config: configPath,
+      yes: true,
+      dryRun: false,
+      json: true,
+      verifyDocs: false,
+      bootstrapOptions: {
+        bootstrapRunner: async (step) => {
+          if (step.id === "bootstrap-web") {
+            configWasStaged = !existsSync(configPath);
+          }
+          return { exitCode: 0, stdout: "", stderr: "" };
+        },
+        simulateBootstrapOutput: true,
+      },
+      smokeRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+    });
+
+    expect(result.status).toBe("success");
+    expect(configWasStaged).toBe(true);
+    expect(existsSync(configPath)).toBe(true);
+  });
+
+  it("restores an in-target project.json when bootstrap fails", async () => {
+    const directory = makeTempDir("restore-config");
+    const configPath = join(directory, "project.json");
+    const originalConfig = readFileSync(join(fixturesDir, "project-web.json"), "utf8");
+    writeFileSync(configPath, originalConfig);
+
+    const result = await runInit({
+      directory,
+      config: configPath,
+      yes: true,
+      dryRun: false,
+      json: true,
+      verifyDocs: false,
+      bootstrapOptions: {
+        bootstrapRunner: async () => ({
+          exitCode: 1,
+          stdout: "",
+          stderr: "scaffolder failed",
+        }),
+      },
+    });
+
+    expect(result.status).toBe("execution_failed");
+    if (result.status === "execution_failed") {
+      expect(result.message).toContain("scaffolder failed");
+    }
+    expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
   });
 
   it("returns the failed smoke step and completed predecessors", async () => {

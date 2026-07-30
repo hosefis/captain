@@ -4,6 +4,7 @@ import {
   readFileSync,
   readdirSync,
   renameSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -95,12 +96,6 @@ const PNPM_ONLY_BUILT_DEPENDENCIES = [
   "unrs-resolver",
 ];
 
-function pnpmBuildPolicy(config: NormalizedProjectConfig) {
-  return config.packageManager === "pnpm"
-    ? { pnpm: { onlyBuiltDependencies: PNPM_ONLY_BUILT_DEPENDENCIES } }
-    : {};
-}
-
 function pnpmWorkspaceYaml(): string {
   return [
     "packages:",
@@ -149,7 +144,6 @@ function writeWorkspaceRoot(
     devDependencies: {
       turbo: "^2.5.0",
     },
-    ...pnpmBuildPolicy(config),
   };
 
   writeFileSync(
@@ -248,7 +242,6 @@ function patchMonorepoRootPackage(
           ...((current.devDependencies as Record<string, string> | undefined) ?? {}),
           turbo: "^2.5.0",
         },
-        ...pnpmBuildPolicy(config),
       },
       null,
       2,
@@ -313,6 +306,11 @@ export function applyWorkspacePromotion(
 
   if (standaloneApp) {
     hoistStandaloneApp(targetDir, standaloneApp);
+    rmSync(join(targetDir, "node_modules"), { recursive: true, force: true });
+    rmSync(
+      join(targetDir, resolvePackageManagerDriver(config.packageManager).lockfile),
+      { force: true },
+    );
     const appSuffix = standaloneApp.replace("apps/", "");
     patchAppPackageName(
       join(targetDir, standaloneApp),
