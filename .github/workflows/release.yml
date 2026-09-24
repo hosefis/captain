@@ -1,0 +1,67 @@
+name: Create release
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Confirm this is a versioned dev to main merge
+        run: node scripts/release-version.mjs verify-release --repo "$GITHUB_REPOSITORY"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - name: Check that the version is not already released
+        id: version
+        shell: bash
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v${version}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null; then
+            echo "${tag} already exists" >&2
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+      - run: pnpm install --frozen-lockfile
+      - name: Generate and validate a web project from the packed package
+        run: pnpm canary:packed
+        env:
+          CAPTAIN_CANARY_ROOT: package-canary-output
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: main-packed-canary-diagnostics
+          path: package-canary-output
+          if-no-files-found: ignore
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Publish GitHub Release
+        run: gh release create "$RELEASE_TAG" --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}

@@ -1,0 +1,150 @@
+name: Publish to npm
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to verify on npm (use v0.1.0 after the manual first publish)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'release' && !github.event.release.prerelease && github.event.release.tag_name != 'v0.1.0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Use an npm CLI with trusted publishing support
+        run: npm install --global 'npm@^11.5.1'
+      - name: Verify release tag, source, and package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          test "$(node -p "require('./package.json').name")" = create-captain
+          test "$RELEASE_TAG" = "v$(node -p "require('./package.json').version")"
+          git fetch origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          test "$(git rev-parse "${RELEASE_TAG}^{commit}")" = "$GITHUB_SHA"
+      - run: pnpm install --frozen-lockfile
+      - name: Recheck the release package
+        run: pnpm canary:packed
+        env:
+          CAPTAIN_CANARY_ROOT: package-canary-output
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: publish-packed-canary-diagnostics
+          path: package-canary-output
+          if-no-files-found: ignore
+      - name: Publish with npm trusted publishing
+        run: npm publish --access public
+
+  verify-published:
+    needs: publish
+    if: always() && (needs.publish.result == 'success' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 9
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Verify tag and package version
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+        shell: bash
+        run: |
+          [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
+          test "$RELEASE_TAG" = "v$(node -p "require('./package.json').version")"
+      - run: pnpm install --frozen-lockfile
+      - name: Generate and validate from the npm registry package
+        id: registry-canary
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+          CAPTAIN_CANARY_ROOT: package-canary-output
+        run: pnpm canary:published -- "${RELEASE_TAG#v}"
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: published-package-canary-diagnostics
+          path: package-canary-output
+          if-no-files-found: ignore
+      - name: Flag a published-package failure
+        if: failure() && steps.registry-canary.outcome == 'failure'
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+        shell: bash
+        run: |
+          echo "::error::Published package ${RELEASE_TAG} failed validation. Fix through dev and release a new patch version."
+          echo "## Published package validation failed" >> "$GITHUB_STEP_SUMMARY"
+          echo "${RELEASE_TAG} needs a fix through dev and a new patch release. npm versions cannot be replaced." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/create-github-app-token@v3
+        id: failure-token
+        if: failure() && steps.registry-canary.outcome == 'failure'
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - name: Mark the GitHub Release as failing validation
+        if: failure() && steps.registry-canary.outcome == 'failure' && steps.failure-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.failure-token.outputs.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+        shell: bash
+        run: |
+          marker="<!-- captain-published-canary-failed:${RELEASE_TAG} -->"
+          notes=$(mktemp)
+          gh release view "$RELEASE_TAG" --json body --jq .body > "$notes"
+          if ! grep -Fq "$marker" "$notes"; then
+            printf '\n\n%s\n## Published package validation failed\nThe published package failed the pnpm dlx web canary. Fix through dev and publish a new patch version. [Failed workflow run](%s/%s/actions/runs/%s).\n' \
+              "$marker" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> "$notes"
+            gh release edit "$RELEASE_TAG" --notes-file "$notes"
+          fi
+      - name: Notify the release maintainer
+        if: failure() && steps.registry-canary.outcome == 'failure' && steps.failure-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.failure-token.outputs.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+          RELEASE_MAINTAINER: ${{ vars.RELEASE_MAINTAINER || github.repository_owner }}
+        shell: bash
+        run: |
+          title="Published canary failed for ${RELEASE_TAG}"
+          existing=$(gh issue list --state all --limit 1000 --json number,title --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ -n "$existing" ]; then
+            gh issue reopen "$existing" || true
+            gh issue comment "$existing" --body "The published package still fails validation: ${run_url}. Fix through dev and publish a new patch version."
+          else
+            gh issue create --title "$title" --assignee "$RELEASE_MAINTAINER" \
+              --body "The published package failed the pnpm dlx web canary: ${run_url}. Fix through dev and publish a new patch version. npm versions cannot be replaced."
+          fi

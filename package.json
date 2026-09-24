@@ -4,6 +4,13 @@
   "description": "CAPTAIN — Create Apps Properly: Templates, Adapters, Integrations, Now",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hosefis/captain.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=22"
   },
@@ -13,15 +20,21 @@
   },
   "files": [
     "dist",
-    "recipes",
     "templates",
-    "compatibility.json"
+    "compatibility.json",
+    "doc-versions.json"
   ],
   "scripts": {
     "build": "tsup",
+    "prepack": "pnpm build",
+    "canary:packed": "node scripts/run-package-canary.mjs packed",
+    "canary:published": "node scripts/run-package-canary.mjs published",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
     "test": "vitest run",
+    "test:release": "node --test scripts/release-version.test.mjs",
+    "test:matrix": "vitest run src/integration/tier-a-golden.test.ts",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -35,8 +48,5 @@
     "tsup": "^8.4.0",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
   }
 }

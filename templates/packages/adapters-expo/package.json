@@ -1,0 +1,24 @@
+{
+  "name": "{adapterPackage}",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./backend/*": "./src/backend/*.ts",
+    "./auth/*": "./src/auth/*.ts",
+    "./i18n/*": "./src/i18n/*.ts",
+    "./ui/*": "./src/ui/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "{corePackage}": "{workspaceRange}"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2"
+  }
+}

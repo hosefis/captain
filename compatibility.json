@@ -1,11 +1,12 @@
 {
-  "version": 1,
-  "hardBlocks": [],
+  "version": 2,
   "agentMode": {
-    "softWarnToBlock": true
+    "softWarn": "upgrade-to-block"
   },
   "humanMode": {
-    "softWarnConfirm": true
+    "softWarn": "confirm-prompt"
   },
-  "payment": {}
+  "hardBlocks": [],
+  "softWarns": [],
+  "recipeBlocks": []
 }
