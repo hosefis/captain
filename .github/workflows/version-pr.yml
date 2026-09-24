@@ -1,0 +1,100 @@
+name: Release version
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled]
+    branches: [main, dev]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  conventional-title-gate:
+    if: github.base_ref == 'dev' && !startsWith(github.head_ref, 'release/version-pr-')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: node scripts/release-version.mjs verify-title --repo "$GITHUB_REPOSITORY" --number "$PR_NUMBER"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+  release-version-gate:
+    if: github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: git fetch origin main dev --tags
+      - run: node scripts/release-version.mjs verify-pr --repo "$GITHUB_REPOSITORY" --number "$PR_NUMBER"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+  version-bot-pr-gate:
+    if: github.base_ref == 'dev' && startsWith(github.head_ref, 'release/version-pr-')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - run: git fetch origin main dev "refs/pull/$PR_NUMBER/head" --tags
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+      - name: Verify proposed version and changed files
+        run: |
+          node scripts/release-version.mjs verify-bot-pr --repo "$GITHUB_REPOSITORY" --number "$PR_NUMBER"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+
+  propose-version:
+    if: github.base_ref == 'main' && github.head_ref == 'dev' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-version-pr-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+      - run: git fetch origin main dev --tags
+      - name: Calculate version
+        id: version
+        run: |
+          node scripts/release-version.mjs plan-pr --repo "$GITHUB_REPOSITORY" --number "$PR_NUMBER" > version-plan.json
+          echo "expected=$(node -p 'JSON.parse(require("fs").readFileSync("version-plan.json")).expected')" >> "$GITHUB_OUTPUT"
+          echo "actual=$(node -p 'JSON.parse(require("fs").readFileSync("version-plan.json")).actual')" >> "$GITHUB_OUTPUT"
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+      - name: Open or update version PR into dev
+        if: steps.version.outputs.expected != steps.version.outputs.actual
+        run: |
+          branch="release/version-pr-$PR_NUMBER"
+          git checkout -B "$branch" origin/dev
+          EXPECTED_VERSION="$EXPECTED_VERSION" node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json","utf8"));p.version=process.env.EXPECTED_VERSION;fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")'
+          git add package.json
+          git -c user.name='captain-release[bot]' -c user.email='captain-release[bot]@users.noreply.github.com' commit -m "chore(release): bump version to $EXPECTED_VERSION" -m 'Set the package version calculated from merged pull request titles on dev.'
+          git push --force-with-lease origin "HEAD:refs/heads/$branch"
+          existing="$(gh pr list --base dev --head "$branch" --state open --json number --jq '.[0].number')"
+          if [ -z "$existing" ]; then
+            gh pr create --base dev --head "$branch" --title "chore(release): bump version to $EXPECTED_VERSION" --body 'Automated semantic version update for the open dev to main release PR.'
+            existing="$(gh pr list --base dev --head "$branch" --state open --json number --jq '.[0].number')"
+          fi
+          gh pr merge "$existing" --auto --merge
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          EXPECTED_VERSION: ${{ steps.version.outputs.expected }}

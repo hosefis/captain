@@ -21,6 +21,7 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm test
+      - run: pnpm test:release
       - run: pnpm test:matrix
       - run: pnpm build
 
@@ -38,10 +39,9 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build
-      - run: node scripts/run-live-matrix.mjs pnpm web
+      - run: pnpm canary:packed
         env:
-          CAPTAIN_MATRIX_ROOT: matrix-output
+          CAPTAIN_CANARY_ROOT: matrix-output
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

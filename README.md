@@ -22,6 +22,9 @@ npx create-captain@latest my-app
 bunx create-captain@latest my-app
 ```
 
+These registry commands become available after the first npm release. See the
+[release guide](docs/releasing.md) for the bootstrap and automated release flow.
+
 The `init` command is optional:
 
 ```bash
