@@ -42,8 +42,14 @@ describe("standalone recipes", () => {
 
     expect(applyRecipes(config, directory).ok).toBe(true);
     expect(existsSync(join(directory, "src/lib/backend/client.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/lib/index.ts"))).toBe(false);
     expect(existsSync(join(directory, "src/features/authorization/types.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/features/authorization/index.ts"))).toBe(false);
     expect(existsSync(join(directory, "src/integrations/auth/clerk.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/integrations/index.ts"))).toBe(false);
+    expect(readFileSync(join(directory, "src/integrations/backend/rest.ts"), "utf-8")).toContain(
+      'from "@/lib/backend/http-client"',
+    );
     expect(existsSync(join(directory, "src/app/layout.tsx"))).toBe(true);
     expect(existsSync(join(directory, "turbo.json"))).toBe(false);
     expect(existsSync(join(directory, "packages"))).toBe(false);
@@ -93,5 +99,38 @@ describe("standalone recipes", () => {
     expect(readFileSync(join(directory, "src/app/_layout.tsx"), "utf-8")).toContain(
       "<Stack />",
     );
+  });
+});
+
+describe("monorepo recipes", () => {
+  it("exports direct module paths without package barrels", () => {
+    const config = parseProjectConfig({
+      ...base,
+      topology: "monorepo",
+      apps: ["web", "mobile"],
+      runtime: "dev-build",
+      auth: "clerk",
+      i18n: { web: "gt-next", mobile: "gt-react-native" },
+      ui: { web: "shadcn-base-ui", mobile: "nativewind" },
+    });
+    const directory = tempDir("monorepo-direct-imports");
+    applyProjectStructure(config, directory);
+
+    expect(applyRecipes(config, directory).ok).toBe(true);
+    for (const packageName of ["core", "adapters-next", "adapters-expo"]) {
+      const packageDir = join(directory, "packages", packageName);
+      const manifest = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf-8")) as {
+        exports: Record<string, string>;
+      };
+      expect(existsSync(join(packageDir, "src/index.ts"))).toBe(false);
+      expect(manifest.exports["."]).toBeUndefined();
+      expect(manifest.exports["./backend/*"]).toBe("./src/backend/*.ts");
+    }
+    expect(
+      readFileSync(join(directory, "packages/adapters-next/src/backend/rest.ts"), "utf-8"),
+    ).toContain('from "@acme/core/backend/http-client"');
+    expect(
+      readFileSync(join(directory, "packages/adapters-expo/src/backend/rest.ts"), "utf-8"),
+    ).toContain('from "@acme/core/backend/client"');
   });
 });

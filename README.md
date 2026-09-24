@@ -181,6 +181,10 @@ Generated projects include:
 - `CONTEXT.md` with the generated stack and layout
 - `.env.example` containing only relevant integration variables
 
+Generated shared modules use direct file imports. Monorepo packages expose
+module subpaths such as `@acme/core/backend/http-client` instead of root barrel
+exports.
+
 ## Develop CAPTAIN
 
 ```bash

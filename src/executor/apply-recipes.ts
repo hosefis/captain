@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { writeRenderedFile } from "../generators/template.js";
 import { templatesDir } from "../lib/paths.js";
@@ -11,13 +11,6 @@ import { testedRange } from "./tested-versions.js";
 export type ApplyRecipesResult =
   | { ok: true; appliedRecipes: string[] }
   | { ok: false; stepId: string; message: string };
-
-type AdapterExports = {
-  backend?: string[];
-  auth?: string[];
-  i18n?: string[];
-  ui?: string[];
-};
 
 function coreSourceDir(
   targetDir: string,
@@ -102,7 +95,6 @@ function applyBackendRest(
       join(core, "backend", "http-client.ts"),
       vars,
     );
-    renderModuleFile("modules/backend-client/core-index.ts", join(core, "index.ts"), vars);
   }
 
   if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
@@ -140,17 +132,6 @@ function applyModuleAuthorization(
   renderModuleFile("modules/authorization/types.ts", join(authDir, "types.ts"), vars);
   renderModuleFile("modules/authorization/authorize.ts", join(authDir, "authorize.ts"), vars);
   renderModuleFile("modules/authorization/in-memory.ts", join(authDir, "in-memory.ts"), vars);
-  if (config.topology !== "monorepo") {
-    writeFileSync(
-      join(authDir, "index.ts"),
-      [
-        'export type { AuthDecision, AuthorizationAction, AuthorizationAdapter, AuthorizationClaims } from "./types.js";',
-        'export { authorize } from "./authorize.js";',
-        'export { createInMemoryAuthorizationAdapter } from "./in-memory.js";',
-        "",
-      ].join("\n"),
-    );
-  }
 }
 
 function applyAuthClerk(
@@ -399,126 +380,6 @@ function applyUiMobileNativewind(
   });
 }
 
-function buildCoreIndex(
-  applied: Set<string>,
-  topology: NormalizedProjectConfig["topology"],
-): string {
-  const lines = [
-    'export type { BackendClient, BackendClientFactory, HttpMethod, HttpRequestOptions } from "./backend/client.js";',
-    'export { createHttpClient, type HttpClientConfig } from "./backend/http-client.js";',
-  ];
-
-  if (applied.has("module-authorization") && topology === "monorepo") {
-    lines.push(
-      'export type { AuthDecision, AuthorizationAction, AuthorizationAdapter, AuthorizationClaims } from "./authorization/types.js";',
-      'export { authorize } from "./authorization/authorize.js";',
-      'export { createInMemoryAuthorizationAdapter } from "./authorization/in-memory.js";',
-    );
-  }
-
-  lines.push('export const CAPTAIN_CORE_VERSION = "0.1.0";');
-
-  return `${lines.join("\n")}\n`;
-}
-
-function writeCoreIndex(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  applied: Set<string>,
-): void {
-  writeFileSync(
-    join(coreSourceDir(targetDir, config), "index.ts"),
-    buildCoreIndex(applied, config.topology),
-  );
-}
-
-function buildAdapterIndex(
-  corePackage: string,
-  adapterKind: "next" | "expo",
-  exports: AdapterExports,
-): string {
-  const lines = [
-    `export * from "${corePackage}";`,
-    `export const ADAPTER = "${adapterKind}" as const;`,
-  ];
-
-  if (exports.backend?.length) {
-    for (const symbol of exports.backend) {
-      lines.push(`export { ${symbol} } from "./backend/rest.js";`);
-    }
-  }
-  if (exports.auth?.length) {
-    for (const symbol of exports.auth) {
-      lines.push(`export { ${symbol} } from "./auth/clerk.js";`);
-    }
-  }
-  if (exports.i18n?.length) {
-    const i18nFile = adapterKind === "next" ? "gt-next.js" : "gt-react-native.js";
-    for (const symbol of exports.i18n) {
-      lines.push(`export { ${symbol} } from "./i18n/${i18nFile.replace(".js", "")}.js";`);
-    }
-  }
-  if (exports.ui?.length) {
-    const uiFile = adapterKind === "next" ? "shadcn.js" : "nativewind.js";
-    for (const symbol of exports.ui) {
-      lines.push(`export { ${symbol} } from "./ui/${uiFile.replace(".js", "")}.js";`);
-    }
-  }
-  return `${lines.join("\n")}\n`;
-}
-
-function writeAdapterIndexes(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
-  applied: Set<string>,
-  onlyApp?: App,
-): void {
-  if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
-    const exports: AdapterExports = {};
-    if (applied.has("backend-rest")) {
-      exports.backend = ["createRestBackendClient"];
-    }
-    if (applied.has("auth-clerk")) {
-      exports.auth = ["clerkAuthConfig", "mapClerkClaims"];
-    }
-    if (applied.has("i18n-web-gt-next")) {
-      exports.i18n = ["gtNextConfig"];
-    }
-    if (applied.has("ui-web-shadcn-base-ui")) {
-      exports.ui = ["shadcnBaseUiConfig"];
-    }
-    if (Object.keys(exports).length > 0) {
-      writeFileSync(
-        join(adapterSourceDir(targetDir, config, "adapters-next"), "index.ts"),
-        buildAdapterIndex(vars.corePackage ?? "", "next", exports),
-      );
-    }
-  }
-
-  if (config.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
-    const exports: AdapterExports = {};
-    if (applied.has("backend-rest")) {
-      exports.backend = ["createRestBackendClient"];
-    }
-    if (applied.has("auth-clerk")) {
-      exports.auth = ["clerkExpoConfig", "mapClerkExpoClaims"];
-    }
-    if (applied.has("i18n-mobile-gt-react-native")) {
-      exports.i18n = ["gtReactNativeConfig"];
-    }
-    if (applied.has("ui-mobile-nativewind")) {
-      exports.ui = ["nativeWindConfig", "nativeWindGlobalCss"];
-    }
-    if (Object.keys(exports).length > 0) {
-      writeFileSync(
-        join(adapterSourceDir(targetDir, config, "adapters-expo"), "index.ts"),
-        buildAdapterIndex(vars.corePackage ?? "", "expo", exports),
-      );
-    }
-  }
-}
-
 const WORKSPACE_CONFIG_STEPS = new Set([
   "project-structure",
   "context-md",
@@ -587,14 +448,6 @@ export function applyRecipes(
       const message = error instanceof Error ? error.message : "Recipe application failed";
       return { ok: false, stepId: step.id, message };
     }
-  }
-
-  try {
-    writeCoreIndex(targetDir, config, applied);
-    writeAdapterIndexes(targetDir, config, vars, applied);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Adapter index generation failed";
-    return { ok: false, stepId: "adapter-index", message };
   }
 
   return { ok: true, appliedRecipes: [...applied] };

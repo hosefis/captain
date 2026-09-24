@@ -35,3 +35,4 @@ Use `{packageManager}` to install dependencies and run the generated
 - Config source of truth: `project.json`
 - Compatibility matrix: see create-captain `compatibility.json`
 - CAPTAIN emits only integrations recorded in the resolved project config.
+- Import generated modules by their file or package subpath; CAPTAIN does not generate barrel files.
