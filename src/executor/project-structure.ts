@@ -45,6 +45,7 @@ function ensurePnpmWorkspace(targetDir: string): void {
 function ensureStandalonePnpmConfig(targetDir: string): void {
   const workspacePath = join(targetDir, "pnpm-workspace.yaml");
   if (!existsSync(workspacePath)) {
+    writeFileSync(workspacePath, 'packages:\n  - "."\n', "utf-8");
     return;
   }
 

@@ -41,6 +41,9 @@ describe("applyProjectStructure", () => {
     expect(existsSync(join(target, "apps"))).toBe(false);
     expect(existsSync(join(target, "packages"))).toBe(false);
     expect(existsSync(join(target, "turbo.json"))).toBe(false);
+    expect(readFileSync(join(target, "pnpm-workspace.yaml"), "utf-8")).toContain(
+      'packages:\n  - "."',
+    );
   });
 
   it("makes a scaffold-generated pnpm config valid for a standalone root", () => {
