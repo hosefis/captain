@@ -14,6 +14,8 @@ const PNPM_ONLY_BUILT_DEPENDENCIES = [
 ];
 // Next's ESLint toolchain cannot load TypeScript 7 from the Turborepo starter.
 const MONOREPO_TYPESCRIPT_VERSION = "5.9.3";
+// Expo's Worklets plugin must resolve Babel 7 from the monorepo root.
+const MONOREPO_BABEL_VERSION = "7.29.7";
 
 function workspaceScripts(): Record<string, string> {
   return {
@@ -110,6 +112,7 @@ function patchMonorepoRoot(
           ...((current.devDependencies as Record<string, string> | undefined) ?? {}),
           turbo: "^2.5.0",
           typescript: MONOREPO_TYPESCRIPT_VERSION,
+          ...(config.apps.includes("mobile") ? { "@babel/core": MONOREPO_BABEL_VERSION } : {}),
         },
       },
       null,
