@@ -118,6 +118,25 @@ describe("runSmokeValidation", () => {
     }
   });
 
+  it("retains command output when both streams contain a failure", async () => {
+    const directory = makeTempDir();
+    writeRootPackageJson(directory, { lint: "eslint ." });
+
+    const result = await runSmokeValidation(directory, ["lint"], {
+      runner: async () => ({
+        exitCode: 1,
+        stdout: "src/button.tsx: lint warning",
+        stderr: "turbo lint exited 1",
+      }),
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.stderr).toContain("src/button.tsx: lint warning");
+      expect(result.stderr).toContain("turbo lint exited 1");
+    }
+  });
+
   it("fails when a required script is missing", async () => {
     const directory = makeTempDir();
     writeRootPackageJson(directory, { typecheck: "tsc --noEmit" });
