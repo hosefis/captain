@@ -4,6 +4,10 @@ import * as p from "@clack/prompts";
 import type { GlobalCliOptions } from "../cli-options.js";
 import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
 import type { RunBootstrapPhaseOptions } from "../executor/run-bootstrap-phase.js";
+import {
+  detectPackageManagers,
+  type PackageManagerAvailability,
+} from "../lib/package-manager-availability.js";
 import { runWizard } from "../prompts/wizard.js";
 import {
   formatBootstrapCommand,
@@ -21,6 +25,7 @@ import {
 import {
   loadProjectConfigFromFile,
   type NormalizedProjectConfig,
+  type PackageManager,
 } from "../schema/project-config.js";
 import type { Command } from "commander";
 import { getGlobalOptions } from "../cli-options.js";
@@ -74,6 +79,7 @@ export type InitResult =
       compatibility: CompatibilityResult;
       plan: InitPlan;
       verifyDocs?: VerifyDocsResult;
+      warnings: string[];
     }
   | {
       status: "success";
@@ -118,6 +124,8 @@ export type InitOptions = GlobalCliOptions & {
   /** Test hook: inject bootstrap execution without network access. */
   bootstrapOptions?: RunBootstrapPhaseOptions;
   onProgress?: RunBootstrapPhaseOptions["onProgress"];
+  /** Test hook: supply package manager version-check results. */
+  packageManagerAvailability?: PackageManagerAvailability;
 };
 
 type StagedProjectConfig = {
@@ -160,7 +168,10 @@ function isAgentMode(options: InitOptions): boolean {
   return Boolean(options.config);
 }
 
-async function loadConfig(options: InitOptions): Promise<
+async function loadConfig(
+  options: InitOptions,
+  packageManagerAvailability: PackageManagerAvailability,
+): Promise<
   | { ok: true; config: NormalizedProjectConfig }
   | { ok: false; message: string }
   | { ok: false; cancelled: true }
@@ -176,12 +187,32 @@ async function loadConfig(options: InitOptions): Promise<
     }
   }
 
-  const wizard = await runWizard({ yes: options.yes });
+  const wizard = await runWizard({
+    yes: options.yes,
+    dryRun: options.dryRun,
+    packageManagerAvailability,
+  });
+  if ("error" in wizard) {
+    return { ok: false, message: wizard.error };
+  }
   if (wizard.cancelled) {
     return { ok: false, cancelled: true };
   }
 
   return { ok: true, config: wizard.config };
+}
+
+function unavailableManagerMessage(
+  selected: PackageManager,
+  availability: PackageManagerAvailability,
+): string {
+  const available = (Object.keys(availability) as PackageManager[]).filter(
+    (manager) => availability[manager],
+  );
+  const choices = available.length > 0
+    ? `Available package managers: ${available.join(", ")}.`
+    : "No supported package managers are available.";
+  return `${selected} is unavailable (its version check failed). ${choices} Install ${selected} and retry, or choose an available package manager.`;
 }
 
 async function confirmWarnings(
@@ -238,7 +269,9 @@ export function buildInitPlan(
 }
 
 export async function runInit(options: InitOptions): Promise<InitResult> {
-  const loaded = await loadConfig(options);
+  const packageManagerAvailability =
+    options.packageManagerAvailability ?? (await detectPackageManagers());
+  const loaded = await loadConfig(options, packageManagerAvailability);
   if (!loaded.ok) {
     if ("cancelled" in loaded && loaded.cancelled) {
       return { status: "cancelled" };
@@ -247,6 +280,13 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   }
 
   const config = loaded.config;
+  const unavailableManager = !packageManagerAvailability[config.packageManager];
+  const managerWarning = unavailableManager
+    ? unavailableManagerMessage(config.packageManager, packageManagerAvailability)
+    : undefined;
+  if (managerWarning && !options.dryRun) {
+    return { status: "validation_error", message: managerWarning };
+  }
   const directory = resolve(options.directory ?? config.name);
   const agentMode = isAgentMode(options);
 
@@ -280,7 +320,14 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   const plan = buildInitPlan(config, directory, agentMode);
 
   if (options.dryRun) {
-    return { status: "dry_run", config, compatibility, plan, verifyDocs };
+    return {
+      status: "dry_run",
+      config,
+      compatibility,
+      plan,
+      verifyDocs,
+      warnings: managerWarning ? [managerWarning] : [],
+    };
   }
 
   const stagedConfig = stageProjectConfigForBootstrap(options.config, directory);
@@ -441,6 +488,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
       compatibility: result.compatibility,
       plan: result.plan,
       verifyDocs: result.verifyDocs,
+      warnings: result.warnings,
     };
 
     if (json) {
@@ -454,6 +502,12 @@ function handleInitResult(result: InitResult, json: boolean): never {
       if (result.compatibility.warns.length > 0) {
         console.log("\nWarnings:");
         console.log(formatCompatibilityResult(result.compatibility));
+      }
+      if (result.warnings.length > 0) {
+        console.log("\nPackage manager warnings:");
+        for (const warning of result.warnings) {
+          console.log(`  ${warning}`);
+        }
       }
       console.log("\nDry run complete — no files were written.");
     }
