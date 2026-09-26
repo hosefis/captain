@@ -2,6 +2,7 @@ import * as p from "@clack/prompts";
 import {
   parseProjectConfig,
   type Auth,
+  type Backend,
   type ExpoRuntime,
   type NormalizedProjectConfig,
   type PackageManager,
@@ -60,6 +61,7 @@ function summary(config: NormalizedProjectConfig): string {
   lines.push(
     `Authentication: ${config.auth}`,
     `Backend: ${config.backend}`,
+    `Convex example: ${config.convexExample ? "yes" : "no"}`,
     `Web i18n: ${config.i18n.web ?? "n/a"}`,
     `Mobile i18n: ${config.i18n.mobile ?? "n/a"}`,
     `Web UI: ${config.ui.web ?? "n/a"}`,
@@ -137,6 +139,27 @@ export async function runWizard(options: { yes?: boolean } = {}): Promise<Wizard
     return { cancelled: true };
   }
 
+  const backend = await selectSupported(
+    "Backend",
+    SUPPORTED_OPTIONS.backends,
+    "rest",
+  );
+  if (cancelIfNeeded(backend)) {
+    return { cancelled: true };
+  }
+
+  let convexExample = false;
+  if (backend === "convex") {
+    const selectedExample = await p.confirm({
+      message: "Include a working Convex task list example?",
+      initialValue: false,
+    });
+    if (cancelIfNeeded(selectedExample)) {
+      return { cancelled: true };
+    }
+    convexExample = selectedExample;
+  }
+
   const mobileI18n = runtime
     ? (await selectSupported(
         "Mobile internationalization",
@@ -184,7 +207,8 @@ export async function runWizard(options: { yes?: boolean } = {}): Promise<Wizard
     scope: deriveScopeFromProjectName(name),
     packageManager: packageManager as PackageManager,
     topology: topology as Topology,
-    backend: SUPPORTED_OPTIONS.backends[0].value,
+    backend: backend as Backend,
+    convexExample,
     auth: auth as Auth,
     i18n:
       topology === "monorepo"

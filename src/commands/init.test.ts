@@ -247,6 +247,7 @@ describe("buildInitPlan", () => {
         topology: "web",
         apps: ["web"],
         backend: "rest",
+        convexExample: false,
         auth: "clerk",
         i18n: { web: "gt-next" },
         ui: { web: "shadcn-base-ui" },

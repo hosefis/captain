@@ -15,6 +15,7 @@ const config: NormalizedProjectConfig = {
   topology: "web",
   apps: ["web"],
   backend: "rest",
+  convexExample: false,
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
@@ -48,5 +49,19 @@ describe("applyConfigEmit", () => {
     expect(loadProjectConfigFromFile(join(targetDir, "project.json")).apps).toEqual([
       "web",
     ]);
+  });
+
+  it("emits only Convex backend variables for a Convex project", () => {
+    const targetDir = join(tmpdir(), `captain-config-convex-${Date.now()}`);
+    mkdirSync(targetDir, { recursive: true });
+
+    applyConfigEmit({ ...config, backend: "convex", convexExample: true }, targetDir);
+
+    const envExample = readFileSync(join(targetDir, ".env.example"), "utf-8");
+    expect(envExample).toContain("NEXT_PUBLIC_CONVEX_URL=");
+    expect(envExample).not.toContain("API_BASE_URL");
+    expect(readFileSync(join(targetDir, "CONTEXT.md"), "utf-8")).toContain(
+      "Convex example | enabled",
+    );
   });
 });

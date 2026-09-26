@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeRenderedFile } from "../generators/template.js";
 import { templatesDir } from "../lib/paths.js";
 import { resolveRecipePlan, type RecipeStep } from "../resolver/recipe-plan.js";
 import type { App, NormalizedProjectConfig } from "../schema/project-config.js";
 import { mergePackageJson } from "./package-json.js";
+import { resolvePackageManagerDriver } from "./package-manager.js";
 import { buildRecipeVars, type RecipeVars } from "./recipe-vars.js";
 import { testedRange } from "./tested-versions.js";
 
@@ -118,6 +119,116 @@ function applyBackendRest(
   }
 }
 
+function applyBackendConvex(
+  targetDir: string,
+  config: NormalizedProjectConfig,
+  vars: RecipeVars,
+): void {
+  const monorepo = config.topology === "monorepo";
+  const functionsDir = monorepo
+    ? join(targetDir, "packages", "convex", "convex")
+    : join(targetDir, "convex");
+  const backendVars = { ...vars, convexApiImport: "./_generated/api" };
+  const backendTemplate = (source: string, target: string): void =>
+    renderModuleFile(`convex/backend/${source}`, join(functionsDir, target), backendVars);
+  renderModuleFile("convex/SETUP.md", join(targetDir, "CONVEX.md"), vars);
+  mkdirSync(join(functionsDir, "_generated"), { recursive: true });
+  backendTemplate(
+    config.convexExample
+      ? config.auth === "clerk" ? "schema-clerk.ts" : "schema.ts"
+      : "schema-empty.ts",
+    "schema.ts",
+  );
+  if (config.auth === "clerk") {
+    backendTemplate("auth.config.ts", "auth.config.ts");
+  }
+  if (config.convexExample) {
+    backendTemplate(config.auth === "clerk" ? "tasks-clerk.ts" : "tasks-public.ts", "tasks.ts");
+  }
+  for (const file of ["api.js", "server.js", "server.d.ts"]) {
+    backendTemplate(`_generated/${file}`, `_generated/${file}`);
+  }
+  backendTemplate(
+    `_generated/${config.convexExample ? "api-tasks.d.ts" : "api-empty.d.ts"}`,
+    "_generated/api.d.ts",
+  );
+  backendTemplate(
+    `_generated/${config.convexExample ? "dataModel-tasks.d.ts" : "dataModel-empty.d.ts"}`,
+    "_generated/dataModel.d.ts",
+  );
+
+  const convexVersion = testedRange("convex");
+  mergePackageJson(join(targetDir, "package.json"), {
+    ...(monorepo ? { devDependencies: { convex: convexVersion } } : { dependencies: { convex: convexVersion } }),
+    scripts: { "convex:dev": "convex dev", "convex:deploy": "convex deploy" },
+  });
+
+  if (monorepo) {
+    writeFileSync(
+      join(targetDir, "convex.json"),
+      `${JSON.stringify({ functions: "packages/convex/convex/" }, null, 2)}\n`,
+    );
+    writeFileSync(
+      join(targetDir, "packages", "convex", "package.json"),
+      `${JSON.stringify({
+        name: `${config.scope}/convex`,
+        version: "0.0.0",
+        private: true,
+        type: "module",
+        exports: {
+          "./_generated/api": {
+            types: "./convex/_generated/api.d.ts",
+            default: "./convex/_generated/api.js",
+          },
+        },
+        scripts: { typecheck: "tsc --noEmit", lint: "tsc --noEmit", build: "tsc --noEmit" },
+        dependencies: { convex: convexVersion },
+        devDependencies: { typescript: "^5.8.2", "@types/node": "^22.13.10" },
+      }, null, 2)}\n`,
+    );
+    writeFileSync(
+      join(targetDir, "packages", "convex", "tsconfig.json"),
+      `${JSON.stringify({ compilerOptions: {
+        target: "ES2022", module: "ESNext", moduleResolution: "bundler",
+        strict: true, skipLibCheck: true, noEmit: true, isolatedModules: true,
+      }, include: ["convex"] }, null, 2)}\n`,
+    );
+  }
+
+  for (const app of config.apps) {
+    const sourceDir = appSourceDir(targetDir, config, app);
+    const appVars = {
+      ...vars,
+      convexApiImport: monorepo
+        ? `${config.scope}/convex/_generated/api`
+        : app === "web"
+          ? "../../../convex/_generated/api"
+          : "../../convex/_generated/api",
+    };
+    const renderApp = (source: string, target: string): void =>
+      renderModuleFile(`convex/${app === "web" ? "web" : "mobile"}/${source}`, join(sourceDir, target), appVars);
+    const authVariant = config.auth === "clerk" ? "clerk" : "none";
+    renderApp(`provider-${authVariant}.tsx`, "integrations/convex/captain-convex-provider.tsx");
+    renderApp("layout.tsx", app === "web" ? "app/layout.tsx" : "app/_layout.tsx");
+    if (app === "web") {
+      renderApp(`server-${authVariant}.ts`, "integrations/convex/server.ts");
+    }
+    if (config.convexExample) {
+      renderApp(`example-page-${authVariant}.tsx`, app === "web" ? "app/example/page.tsx" : "app/example.tsx");
+      renderApp("home.tsx", app === "web" ? "app/page.tsx" : "app/index.tsx");
+      if (app === "mobile" && config.auth === "clerk") {
+        renderApp("sign-in.tsx", "app/sign-in.tsx");
+      }
+    }
+    const appDependencies: Record<string, string> = { convex: convexVersion };
+    if (monorepo) {
+      appDependencies[`${config.scope}/convex`] =
+        resolvePackageManagerDriver(config.packageManager).workspaceRange;
+    }
+    mergeAppPackageJson(targetDir, config, app, { dependencies: appDependencies });
+  }
+}
+
 function applyModuleAuthorization(
   targetDir: string,
   config: NormalizedProjectConfig,
@@ -203,16 +314,34 @@ function applyAuthClerk(
       join(appSourceDir(targetDir, config, "mobile"), "app", "_layout.tsx"),
       vars,
     );
+    const appJsonPath = join(appDir(targetDir, config, "mobile"), "app.json");
+    if (existsSync(appJsonPath)) {
+      const appJson = JSON.parse(readFileSync(appJsonPath, "utf-8")) as {
+        expo?: { plugins?: Array<string | unknown[]>; [key: string]: unknown };
+      };
+      const expo = appJson.expo ?? {};
+      const plugins = expo.plugins ?? [];
+      for (const plugin of ["expo-secure-store", "@clerk/expo"]) {
+        if (!plugins.some((entry) => entry === plugin || (Array.isArray(entry) && entry[0] === plugin))) {
+          plugins.push(plugin);
+        }
+      }
+      writeFileSync(appJsonPath, `${JSON.stringify({ ...appJson, expo: { ...expo, plugins } }, null, 2)}\n`);
+    }
     mergePackageJson(integrationPackageJson(targetDir, config, "adapters-expo"), {
       dependencies: {
         "@clerk/expo": testedRange("@clerk/expo"),
         "expo-secure-store": testedRange("expo-secure-store"),
+        "expo-auth-session": testedRange("expo-auth-session"),
+        "expo-crypto": testedRange("expo-crypto"),
       },
     });
     mergeAppPackageJson(targetDir, config, "mobile", {
       dependencies: {
         "@clerk/expo": testedRange("@clerk/expo"),
         "expo-secure-store": testedRange("expo-secure-store"),
+        "expo-auth-session": testedRange("expo-auth-session"),
+        "expo-crypto": testedRange("expo-crypto"),
       },
     });
   }
@@ -363,6 +492,21 @@ function applyUiMobileNativewind(
     join(appSourceDir(targetDir, config, "mobile"), "nativewind-env.d.ts"),
     vars,
   );
+  renderModuleFile(
+    "scaffold/expo-eslint.config.js",
+    join(appDir(targetDir, config, "mobile"), "eslint.config.js"),
+    vars,
+  );
+  renderModuleFile(
+    "scaffold/nativewind-tailwind.config.js",
+    join(appDir(targetDir, config, "mobile"), "tailwind.config.js"),
+    vars,
+  );
+  renderModuleFile(
+    "scaffold/nativewind-babel.config.js",
+    join(appDir(targetDir, config, "mobile"), "babel.config.js"),
+    vars,
+  );
   if (config.auth === "none") {
     renderModuleFile(
       "scaffold/captain-expo-layout-no-auth.tsx",
@@ -373,9 +517,15 @@ function applyUiMobileNativewind(
   mergeAppPackageJson(targetDir, config, "mobile", {
     dependencies: {
       nativewind: testedRange("nativewind"),
+      "react-native-css-interop": testedRange("react-native-css-interop"),
     },
     devDependencies: {
       tailwindcss: testedRange("tailwindcss"),
+      eslint: testedRange("eslint"),
+      "eslint-config-expo": testedRange("eslint-config-expo"),
+      "babel-preset-expo": testedRange("babel-preset-expo"),
+      "@babel/core": testedRange("@babel/core"),
+      "@babel/types": testedRange("@babel/types"),
     },
   });
 }
@@ -396,6 +546,9 @@ function applyRecipeStep(
   switch (step.id) {
     case "backend-rest":
       applyBackendRest(targetDir, config, vars);
+      break;
+    case "backend-convex":
+      applyBackendConvex(targetDir, config, vars);
       break;
     case "module-authorization":
       applyModuleAuthorization(targetDir, config, vars);

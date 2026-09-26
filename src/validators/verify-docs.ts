@@ -71,6 +71,10 @@ export function resolvePackagesForConfig(config: NormalizedProjectConfig): strin
     packages.add("create-turbo");
   }
 
+  if (config.backend === "convex") {
+    packages.add("convex");
+  }
+
   if (config.auth === "clerk") {
     if (config.stacks.hasWeb) {
       packages.add("@clerk/nextjs");
@@ -78,6 +82,8 @@ export function resolvePackagesForConfig(config: NormalizedProjectConfig): strin
     if (config.stacks.hasMobile) {
       packages.add("@clerk/expo");
       packages.add("expo-secure-store");
+      packages.add("expo-auth-session");
+      packages.add("expo-crypto");
     }
   }
 
@@ -100,7 +106,13 @@ export function resolvePackagesForConfig(config: NormalizedProjectConfig): strin
 
   if (config.ui.mobile === "nativewind") {
     packages.add("nativewind");
+    packages.add("react-native-css-interop");
     packages.add("tailwindcss");
+    packages.add("eslint");
+    packages.add("eslint-config-expo");
+    packages.add("babel-preset-expo");
+    packages.add("@babel/core");
+    packages.add("@babel/types");
   }
 
   return [...packages].sort();

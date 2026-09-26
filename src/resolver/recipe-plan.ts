@@ -33,11 +33,13 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     },
   ];
 
-  steps.push({
-    id: `backend-${config.backend}`,
-    phase: "adapter",
-    description: `BackendClient adapter for backend: ${config.backend}`,
-  });
+  if (config.backend === "rest") {
+    steps.push({
+      id: "backend-rest",
+      phase: "adapter",
+      description: "BackendClient adapter for backend: rest",
+    });
+  }
 
   if (config.auth !== "none") {
     steps.push({
@@ -91,6 +93,14 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
       id: `ui-mobile-${config.ui.mobile}`,
       phase: "adapter",
       description: `Mobile UI adapter: ${config.ui.mobile}`,
+    });
+  }
+
+  if (config.backend === "convex") {
+    steps.push({
+      id: "backend-convex",
+      phase: "adapter",
+      description: "Set up the Convex backend and application providers",
     });
   }
 

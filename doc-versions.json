@@ -14,17 +14,29 @@
       "validated": "2.5.4",
       "docs": "https://turbo.build/repo/docs/getting-started/installation"
     },
+    "convex": {
+      "validated": "1.46.0",
+      "docs": "https://docs.convex.dev/"
+    },
     "@clerk/nextjs": {
       "validated": "6.22.0",
       "docs": "https://clerk.com/docs/quickstarts/nextjs"
     },
     "@clerk/expo": {
-      "validated": "2.11.0",
+      "validated": "4.7.1",
       "docs": "https://clerk.com/docs/quickstarts/expo"
     },
     "expo-secure-store": {
-      "validated": "14.2.3",
+      "validated": "57.0.4",
       "docs": "https://docs.expo.dev/versions/latest/sdk/securestore/"
+    },
+    "expo-auth-session": {
+      "validated": "57.0.13",
+      "docs": "https://clerk.com/docs/expo/getting-started/quickstart"
+    },
+    "expo-crypto": {
+      "validated": "57.0.3",
+      "docs": "https://clerk.com/docs/expo/getting-started/quickstart"
     },
     "gt-next": {
       "validated": "1.2.0",
@@ -35,23 +47,47 @@
       "docs": "https://generaltranslation.com/en-US/docs/cli"
     },
     "gt-react-native": {
-      "validated": "1.2.0",
+      "validated": "11.4.5",
       "docs": "https://generaltranslation.com/en-US/docs/react-native/tutorials/quickstart-expo"
     },
     "expo-localization": {
-      "validated": "16.1.5",
+      "validated": "57.0.2",
       "docs": "https://docs.expo.dev/guides/localization/"
+    },
+    "eslint": {
+      "validated": "9.39.5",
+      "docs": "https://eslint.org/docs/latest/"
+    },
+    "eslint-config-expo": {
+      "validated": "57.0.2",
+      "docs": "https://docs.expo.dev/guides/using-eslint/"
+    },
+    "babel-preset-expo": {
+      "validated": "57.0.13",
+      "docs": "https://www.nativewind.dev/docs/getting-started/installation"
+    },
+    "@babel/core": {
+      "validated": "7.29.7",
+      "docs": "https://babeljs.io/docs/babel-core"
+    },
+    "@babel/types": {
+      "validated": "7.29.8",
+      "docs": "https://babeljs.io/docs/babel-types"
     },
     "shadcn": {
       "validated": "2.5.0",
       "docs": "https://ui.shadcn.com/docs/changelog/2026-01-base-ui"
     },
     "nativewind": {
-      "validated": "4.1.23",
+      "validated": "4.2.7",
       "docs": "https://www.nativewind.dev/getting-started/expo"
     },
+    "react-native-css-interop": {
+      "validated": "0.2.7",
+      "docs": "https://www.nativewind.dev/docs/getting-started/installation"
+    },
     "tailwindcss": {
-      "validated": "4.1.8",
+      "validated": "3.4.19",
       "docs": "https://tailwindcss.com/docs/installation"
     },
     "react": {

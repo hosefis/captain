@@ -16,6 +16,7 @@ const tierAWebConfig: NormalizedProjectConfig = {
   topology: "web",
   apps: ["web"],
   backend: "rest",
+  convexExample: false,
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
@@ -72,6 +73,11 @@ describe("resolvePackagesForConfig", () => {
     expect(packages).toContain("gt-react-native");
     expect(packages).toContain("nativewind");
     expect(packages).toContain("expo-localization");
+  });
+
+  it("includes the Convex SDK only for Convex projects", () => {
+    expect(resolvePackagesForConfig(tierAWebConfig)).not.toContain("convex");
+    expect(resolvePackagesForConfig({ ...tierAWebConfig, backend: "convex" })).toContain("convex");
   });
 });
 
