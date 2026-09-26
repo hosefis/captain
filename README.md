@@ -47,6 +47,14 @@ The wizard asks trajectory-changing questions first:
 8. Locales when internationalization is enabled
 9. Final configuration review
 
+The wizard checks `pnpm --version`, `npm --version`, and `bun --version` and
+marks managers that cannot run as unavailable. It suggests the first available
+manager in that order. Choosing an unavailable manager stops creation before
+the target directory is changed; the same check applies to `project.json`
+configurations. Install the selected manager or choose one shown as available
+and try again. `--dry-run` still shows the plan and warns if the selected
+manager is unavailable.
+
 Choices that have only one supported answer are resolved automatically and
 shown in the final review. Later questions are filtered using earlier answers.
 For example, Expo Go disables mobile internationalization, while an Expo
