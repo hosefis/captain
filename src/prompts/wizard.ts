@@ -1,5 +1,9 @@
 import * as p from "@clack/prompts";
 import {
+  detectPackageManagers,
+  type PackageManagerAvailability,
+} from "../lib/package-manager-availability.js";
+import {
   parseProjectConfig,
   type Auth,
   type Backend,
@@ -16,7 +20,22 @@ import {
 
 type WizardResult =
   | { cancelled: true }
+  | { error: string }
   | { cancelled: false; config: NormalizedProjectConfig };
+
+const packageManagers: readonly PackageManager[] = ["pnpm", "npm", "bun"];
+
+function availablePackageManagers(availability: PackageManagerAvailability): PackageManager[] {
+  return packageManagers.filter((manager) => availability[manager]);
+}
+
+function unavailableMessage(
+  manager: PackageManager,
+  availability: PackageManagerAvailability,
+): string {
+  const available = availablePackageManagers(availability);
+  return `${manager} --version failed. Install ${manager} and retry. Available package managers: ${available.length ? available.join(", ") : "none"}.`;
+}
 
 function cancelIfNeeded<T>(value: T | symbol): value is symbol {
   if (p.isCancel(value)) {
@@ -76,7 +95,20 @@ function summary(config: NormalizedProjectConfig): string {
   return lines.join("\n");
 }
 
-export async function runWizard(options: { yes?: boolean } = {}): Promise<WizardResult> {
+export async function runWizard(
+  options: {
+    yes?: boolean;
+    dryRun?: boolean;
+    packageManagerAvailability?: PackageManagerAvailability;
+  } = {},
+): Promise<WizardResult> {
+  const availability = options.packageManagerAvailability ?? await detectPackageManagers();
+  const available = availablePackageManagers(availability);
+  if (available.length === 0 && !options.dryRun) {
+    return {
+      error: "No package manager passed its version check. Install pnpm, npm, or bun and retry.",
+    };
+  }
   p.intro("CAPTAIN — Create Apps Properly");
 
   const name = await p.text({
@@ -98,11 +130,24 @@ export async function runWizard(options: { yes?: boolean } = {}): Promise<Wizard
 
   const packageManager = await selectSupported(
     "Package manager",
-    SUPPORTED_OPTIONS.packageManagers,
-    "pnpm",
+    SUPPORTED_OPTIONS.packageManagers.map((option) => ({
+      value: option.value,
+      label: availability[option.value]
+        ? option.label
+        : `${option.value} (unavailable: ${option.value} --version failed)`,
+    })),
+    available[0] ?? "pnpm",
   );
   if (cancelIfNeeded(packageManager)) {
     return { cancelled: true };
+  }
+
+  if (!availability[packageManager as PackageManager]) {
+    const message = unavailableMessage(packageManager as PackageManager, availability);
+    if (!options.dryRun) {
+      return { error: message };
+    }
+    p.log.warn(`Dry run only: ${message} A real run would stop here.`);
   }
 
   const topology = await selectSupported(
