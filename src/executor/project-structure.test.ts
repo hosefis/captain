@@ -79,8 +79,11 @@ describe("applyProjectStructure", () => {
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
     const target = directory("monorepo");
+    writeFileSync(join(target, "package.json"), '{"name":"seed","devDependencies":{"typescript":"7.0.2"}}\n');
     mkdirSync(join(target, "apps/web"), { recursive: true });
     mkdirSync(join(target, "apps/mobile"), { recursive: true });
+    mkdirSync(join(target, "packages/ui"), { recursive: true });
+    writeFileSync(join(target, "packages/ui/package.json"), '{"name":"@repo/ui","devDependencies":{"typescript":"7.0.2"}}\n');
     writeFileSync(join(target, "apps/web/pnpm-workspace.yaml"), 'packages:\n  - "."\n');
     writeFileSync(join(target, "apps/web/package.json"), '{"name":"web","packageManager":"pnpm@11.25.0","scripts":{"build":"next build"}}\n');
     writeFileSync(join(target, "apps/mobile/package.json"), '{"name":"mobile","scripts":{"start":"expo start"}}\n');
@@ -94,11 +97,37 @@ describe("applyProjectStructure", () => {
     expect(
       JSON.parse(readFileSync(join(target, "package.json"), "utf-8")).scripts.dev,
     ).toBe("turbo dev");
+    expect(JSON.parse(readFileSync(join(target, "package.json"), "utf-8")).devDependencies.typescript).toBe("5.9.3");
+    expect(JSON.parse(readFileSync(join(target, "packages/ui/package.json"), "utf-8")).devDependencies.typescript).toBe("5.9.3");
     expect(existsSync(join(target, "apps/web/pnpm-workspace.yaml"))).toBe(false);
     const web = JSON.parse(readFileSync(join(target, "apps/web/package.json"), "utf-8"));
     const mobile = JSON.parse(readFileSync(join(target, "apps/mobile/package.json"), "utf-8"));
     expect(web.packageManager).toBeUndefined();
     expect(web.scripts.typecheck).toBe("tsc --noEmit");
     expect(mobile.scripts.build).toBe("expo export");
+  });
+
+  it("resolves the shared Babel preset from its own package for Bun installs", () => {
+    const config = parseProjectConfig({
+      ...base,
+      packageManager: "bun",
+      topology: "monorepo",
+      runtime: "expo-go",
+      i18n: { web: "gt-next", mobile: "none" },
+      ui: { web: "shadcn-base-ui", mobile: "nativewind" },
+    });
+    const target = directory("bun-eslint");
+    const eslintDir = join(target, "packages/eslint-config");
+    mkdirSync(eslintDir, { recursive: true });
+    writeFileSync(
+      join(eslintDir, "base.js"),
+      'export const config = { presets: ["@babel/preset-typescript"] };\n',
+    );
+
+    applyProjectStructure(config, target);
+
+    const patched = readFileSync(join(eslintDir, "base.js"), "utf-8");
+    expect(patched).toContain('createRequire(import.meta.url).resolve("@babel/preset-typescript")');
+    expect(patched).toContain('import { createRequire } from "node:module"');
   });
 });

@@ -8,10 +8,10 @@ import { execa } from "execa";
 const repository = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const [mode, version] = process.argv.slice(2).filter((arg) => arg !== "--");
 
-if (mode !== "packed" && mode !== "published") {
-  throw new Error("Usage: node scripts/run-package-canary.mjs packed|published [version]");
+if (!["packed", "published", "available"].includes(mode)) {
+  throw new Error("Usage: node scripts/run-package-canary.mjs packed|published|available [version]");
 }
-if (mode === "published" && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version ?? "")) {
+if (mode !== "packed" && !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version ?? "")) {
   throw new Error("Pass an explicit published version, for example: pnpm canary:published -- 0.2.0");
 }
 
@@ -45,48 +45,54 @@ async function run(command, args, cwd, allowFailure = false) {
 }
 
 async function waitForPublishedVersion(packageSpec) {
-  for (let attempt = 1; attempt <= 12; attempt++) {
+  const maxAttempts = 60;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const { output, exitCode } = await run(
-      "npm", ["view", packageSpec, "version", "--json"], root, true,
+      "npm", ["view", packageSpec, "version", "--json", "--prefer-online"], root, true,
     );
     if (exitCode === 0) return;
     if (!/E404|404 Not Found|No match found for version/i.test(output)) {
       throw new Error(`Registry lookup failed for ${packageSpec}. Diagnostics: ${log}`);
     }
-    if (attempt === 12) {
-      throw new Error(`${packageSpec} was not available after 12 registry checks. Diagnostics: ${log}`);
+    if (attempt === maxAttempts) {
+      throw new Error(`${packageSpec} was not available after ${maxAttempts} registry checks. Diagnostics: ${log}`);
     }
-    console.log(`Waiting 10 seconds for ${packageSpec} to reach npm (${attempt}/12)`);
+    console.log(`Waiting 10 seconds for ${packageSpec} to reach npm (${attempt}/${maxAttempts})`);
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 10_000));
   }
 }
 
 try {
-  let packageSpec;
-  if (mode === "packed") {
-    const { output } = await run("npm", ["pack", "--json", "--pack-destination", root], repository);
-    const start = output.indexOf("[\n");
-    const packed = JSON.parse(output.slice(start));
-    packageSpec = join(root, packed[0].filename);
-    if (!existsSync(packageSpec)) throw new Error(`Tarball missing: ${packageSpec}`);
+  if (mode === "available") {
+    await waitForPublishedVersion(`create-captain@${version}`);
+    console.log(`create-captain@${version} is available on npm`);
   } else {
-    packageSpec = `create-captain@${version}`;
-    await waitForPublishedVersion(packageSpec);
-  }
-
-  // Run outside the repository so no local dist, templates, or dependencies can satisfy this check.
-  await run("pnpm", ["dlx", packageSpec, project, "--config", config, "--yes", "--json"], root);
-
-  const generatedPackage = JSON.parse(readFileSync(join(project, "package.json"), "utf8"));
-  if (!existsSync(join(project, "src", "app")) || !existsSync(join(project, "node_modules"))) {
-    throw new Error("Generated web project is missing src/app or installed dependencies");
-  }
-  for (const script of ["typecheck", "lint", "build"]) {
-    if (!generatedPackage.scripts?.[script]) {
-      throw new Error(`Generated web project is missing ${script} script`);
+    let packageSpec;
+    if (mode === "packed") {
+      const { output } = await run("npm", ["pack", "--json", "--pack-destination", root], repository);
+      const start = output.indexOf("[\n");
+      const packed = JSON.parse(output.slice(start));
+      packageSpec = join(root, packed[0].filename);
+      if (!existsSync(packageSpec)) throw new Error(`Tarball missing: ${packageSpec}`);
+    } else {
+      packageSpec = `create-captain@${version}`;
+      await waitForPublishedVersion(packageSpec);
     }
+
+    // Run outside the repository so no local dist, templates, or dependencies can satisfy this check.
+    await run("pnpm", ["dlx", packageSpec, project, "--config", config, "--yes", "--json"], root);
+
+    const generatedPackage = JSON.parse(readFileSync(join(project, "package.json"), "utf8"));
+    if (!existsSync(join(project, "src", "app")) || !existsSync(join(project, "node_modules"))) {
+      throw new Error("Generated web project is missing src/app or installed dependencies");
+    }
+    for (const script of ["typecheck", "lint", "build"]) {
+      if (!generatedPackage.scripts?.[script]) {
+        throw new Error(`Generated web project is missing ${script} script`);
+      }
+    }
+    console.log(`${mode} canary passed: generated pnpm web project and CLI smoke validation`);
   }
-  console.log(`${mode} canary passed: generated pnpm web project and CLI smoke validation`);
   if (!configuredRoot) rmSync(root, { recursive: true, force: true });
 } catch (error) {
   console.error(error);

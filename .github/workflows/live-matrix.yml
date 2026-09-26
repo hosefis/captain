@@ -35,5 +35,9 @@ jobs:
         if: failure()
         with:
           name: ${{ matrix.package-manager }}-${{ matrix.topology }}-${{ matrix.backend }}-diagnostics
-          path: matrix-output
+          path: |
+            matrix-output
+            !matrix-output/generated/**/node_modules/**
+            !matrix-output/generated/**/.git/**
+            !matrix-output/generated/**/.next/**
           if-no-files-found: warn

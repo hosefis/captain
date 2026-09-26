@@ -118,7 +118,7 @@ export async function runSmokeValidation(
         ok: false,
         failedStep: step,
         exitCode: result.exitCode,
-        stderr: result.stderr || result.stdout || `${step} failed`,
+        stderr: [result.stdout, result.stderr].filter(Boolean).join("\n") || `${step} failed`,
         fixHint: smokeFixHint(step),
         completedSteps,
       };
