@@ -108,5 +108,6 @@ The App must create the GitHub Release. A Release made with the built-in `GITHUB
 
 ### If the published canary fails
 
-1. Read the **Publish to npm** run, its GitHub Release failure note, and the assigned issue. Download `published-package-canary-diagnostics` if present.
-2. Fix through a PR into `dev`, then release the **next patch version** through a `dev` → `main` PR. npm cannot replace the failed version. Close the issue only after the new registry canary passes.
+1. If **Wait for the published version to reach npm** fails, check `npm view create-captain@X.Y.Z version` and rerun verification for the existing tag after the version appears. The workflow waits roughly ten minutes and does not flag the package as broken for registry delay.
+2. If **Generate and validate from the npm registry package** fails, read the run, its GitHub Release failure note, and the assigned issue. Download `published-package-canary-diagnostics` if present.
+3. Fix a genuine package failure through a PR into `dev`, then release the **next patch version** through a `dev` → `main` PR. npm cannot replace the failed version. Close the issue only after the new registry canary passes.
