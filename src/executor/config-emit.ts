@@ -16,6 +16,7 @@ function templateVars(config: NormalizedProjectConfig): Record<string, string> {
     packageManager: config.packageManager,
     topology: config.topology,
     backend: config.backend,
+    backendNotes: config.backend === "convex" ? "- Convex setup: see `CONVEX.md`." : "",
     auth: config.auth,
     i18nWeb,
     i18nMobile,
@@ -25,9 +26,24 @@ function templateVars(config: NormalizedProjectConfig): Record<string, string> {
     defaultLocale: config.defaultLocale,
     apps: config.apps.join(", "),
     runtime: config.runtime ?? "n/a",
+    convexExample: config.convexExample ? "enabled" : "disabled",
+    backendEnvironment:
+      config.backend === "convex"
+        ? [
+            "# Convex (run the convex:dev script to configure a deployment)",
+            "CONVEX_DEPLOYMENT=",
+            ...(config.stacks.hasWeb ? ["NEXT_PUBLIC_CONVEX_URL="] : []),
+            ...(config.stacks.hasMobile ? ["EXPO_PUBLIC_CONVEX_URL="] : []),
+          ].join("\n")
+        : "# REST backend\nAPI_BASE_URL=http://localhost:4000",
     authEnvironment:
       config.auth === "clerk"
-        ? "# Clerk\nNEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\nCLERK_SECRET_KEY="
+        ? [
+            "# Clerk",
+            ...(config.stacks.hasWeb ? ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=", "CLERK_SECRET_KEY="] : []),
+            ...(config.stacks.hasMobile ? ["EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="] : []),
+            ...(config.backend === "convex" ? ["# Set CLERK_JWT_ISSUER_DOMAIN on the Convex deployment"] : []),
+          ].join("\n")
         : "# Authentication disabled",
     i18nEnvironment:
       config.i18n.web || config.i18n.mobile !== "none"
@@ -50,6 +66,20 @@ export function emitEnvExample(config: NormalizedProjectConfig, targetDir: strin
     join(targetDir, ".env.example"),
     templateVars(config),
   );
+  if (config.topology === "monorepo" && config.backend === "convex") {
+    const webVariables = [
+      "NEXT_PUBLIC_CONVEX_URL=",
+      ...(config.auth === "clerk"
+        ? ["NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=", "CLERK_SECRET_KEY="]
+        : []),
+    ];
+    const mobileVariables = [
+      "EXPO_PUBLIC_CONVEX_URL=",
+      ...(config.auth === "clerk" ? ["EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="] : []),
+    ];
+    writeFileSync(join(targetDir, "apps", "web", ".env.example"), `${webVariables.join("\n")}\n`);
+    writeFileSync(join(targetDir, "apps", "mobile", ".env.example"), `${mobileVariables.join("\n")}\n`);
+  }
 }
 
 export function emitProjectJson(config: NormalizedProjectConfig, targetDir: string): void {

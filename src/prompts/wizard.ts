@@ -1,7 +1,12 @@
 import * as p from "@clack/prompts";
 import {
+  detectPackageManagers,
+  type PackageManagerAvailability,
+} from "../lib/package-manager-availability.js";
+import {
   parseProjectConfig,
   type Auth,
+  type Backend,
   type ExpoRuntime,
   type NormalizedProjectConfig,
   type PackageManager,
@@ -15,7 +20,22 @@ import {
 
 type WizardResult =
   | { cancelled: true }
+  | { error: string }
   | { cancelled: false; config: NormalizedProjectConfig };
+
+const packageManagers: readonly PackageManager[] = ["pnpm", "npm", "bun"];
+
+function availablePackageManagers(availability: PackageManagerAvailability): PackageManager[] {
+  return packageManagers.filter((manager) => availability[manager]);
+}
+
+function unavailableMessage(
+  manager: PackageManager,
+  availability: PackageManagerAvailability,
+): string {
+  const available = availablePackageManagers(availability);
+  return `${manager} --version failed. Install ${manager} and retry. Available package managers: ${available.length ? available.join(", ") : "none"}.`;
+}
 
 function cancelIfNeeded<T>(value: T | symbol): value is symbol {
   if (p.isCancel(value)) {
@@ -60,6 +80,7 @@ function summary(config: NormalizedProjectConfig): string {
   lines.push(
     `Authentication: ${config.auth}`,
     `Backend: ${config.backend}`,
+    `Convex example: ${config.convexExample ? "yes" : "no"}`,
     `Web i18n: ${config.i18n.web ?? "n/a"}`,
     `Mobile i18n: ${config.i18n.mobile ?? "n/a"}`,
     `Web UI: ${config.ui.web ?? "n/a"}`,
@@ -74,7 +95,20 @@ function summary(config: NormalizedProjectConfig): string {
   return lines.join("\n");
 }
 
-export async function runWizard(options: { yes?: boolean } = {}): Promise<WizardResult> {
+export async function runWizard(
+  options: {
+    yes?: boolean;
+    dryRun?: boolean;
+    packageManagerAvailability?: PackageManagerAvailability;
+  } = {},
+): Promise<WizardResult> {
+  const availability = options.packageManagerAvailability ?? await detectPackageManagers();
+  const available = availablePackageManagers(availability);
+  if (available.length === 0 && !options.dryRun) {
+    return {
+      error: "No package manager passed its version check. Install pnpm, npm, or bun and retry.",
+    };
+  }
   p.intro("CAPTAIN — Create Apps Properly");
 
   const name = await p.text({
@@ -96,11 +130,24 @@ export async function runWizard(options: { yes?: boolean } = {}): Promise<Wizard
 
   const packageManager = await selectSupported(
     "Package manager",
-    SUPPORTED_OPTIONS.packageManagers,
-    "pnpm",
+    SUPPORTED_OPTIONS.packageManagers.map((option) => ({
+      value: option.value,
+      label: availability[option.value]
+        ? option.label
+        : `${option.value} (unavailable: ${option.value} --version failed)`,
+    })),
+    available[0] ?? "pnpm",
   );
   if (cancelIfNeeded(packageManager)) {
     return { cancelled: true };
+  }
+
+  if (!availability[packageManager as PackageManager]) {
+    const message = unavailableMessage(packageManager as PackageManager, availability);
+    if (!options.dryRun) {
+      return { error: message };
+    }
+    p.log.warn(`Dry run only: ${message} A real run would stop here.`);
   }
 
   const topology = await selectSupported(
@@ -135,6 +182,27 @@ export async function runWizard(options: { yes?: boolean } = {}): Promise<Wizard
   );
   if (cancelIfNeeded(auth)) {
     return { cancelled: true };
+  }
+
+  const backend = await selectSupported(
+    "Backend",
+    SUPPORTED_OPTIONS.backends,
+    "rest",
+  );
+  if (cancelIfNeeded(backend)) {
+    return { cancelled: true };
+  }
+
+  let convexExample = false;
+  if (backend === "convex") {
+    const selectedExample = await p.confirm({
+      message: "Include a working Convex task list example?",
+      initialValue: false,
+    });
+    if (cancelIfNeeded(selectedExample)) {
+      return { cancelled: true };
+    }
+    convexExample = selectedExample;
   }
 
   const mobileI18n = runtime
@@ -184,7 +252,8 @@ export async function runWizard(options: { yes?: boolean } = {}): Promise<Wizard
     scope: deriveScopeFromProjectName(name),
     packageManager: packageManager as PackageManager,
     topology: topology as Topology,
-    backend: SUPPORTED_OPTIONS.backends[0].value,
+    backend: backend as Backend,
+    convexExample,
     auth: auth as Auth,
     i18n:
       topology === "monorepo"

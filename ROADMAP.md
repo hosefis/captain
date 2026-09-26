@@ -18,7 +18,7 @@
 ## Backends
 
 - [x] REST
-- [ ] Convex
+- [x] Convex
 - [ ] Supabase
 - [ ] Firebase
 

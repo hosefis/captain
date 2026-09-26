@@ -40,7 +40,7 @@ Do this **before** the first `dev` → `main` merge. The `Create release` workfl
 
 npm's trusted publisher requires an existing package, so this first publish uses a maintainer's npm account. Confirm that account can publish the public, unscoped name `create-captain` and meets npm's current authentication requirements. See [npm's public-package guide](https://docs.npmjs.com/creating-and-publishing-unscoped-public-packages/).
 
-1. On a maintainer machine with Git, Node 22 or newer, pnpm 9, and npm, use a **clean checkout**. In PowerShell:
+1. On a maintainer machine with Git, Node 22 or newer, npm, and the pnpm version pinned by the tag's `package.json` (`packageManager`), use a **clean checkout**. In PowerShell:
 
    ```powershell
    git clone https://github.com/hosefis/captain.git captain-first-release

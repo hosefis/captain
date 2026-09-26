@@ -61,7 +61,7 @@ describe("project config", () => {
 
   it("rejects removed options and fields", () => {
     for (const input of [
-      { ...webInput, backend: "convex" },
+      { ...webInput, backend: "supabase" },
       { ...webInput, auth: "workos" },
       { ...webInput, modules: ["authorization"] },
       { ...webInput, validation: "relaxed" },

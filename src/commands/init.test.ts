@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 import { buildInitPlan, runInit } from "./init.js";
 
 const fixturesDir = join(import.meta.dirname, "../../fixtures");
+const allAvailable = { pnpm: true, npm: true, bun: true };
+const pnpmUnavailable = { pnpm: false, npm: true, bun: false };
 
 function makeTempDir(label: string): string {
   const directory = join(
@@ -16,6 +18,56 @@ function makeTempDir(label: string): string {
 }
 
 describe("runInit", () => {
+  it("stops before creating a target when the configured manager is unavailable", async () => {
+    const directory = join(makeTempDir("missing-parent"), "new-project");
+    const result = await runInit({
+      directory,
+      config: join(fixturesDir, "project-web.json"),
+      packageManagerAvailability: pnpmUnavailable,
+    });
+
+    expect(result.status).toBe("validation_error");
+    if (result.status === "validation_error") {
+      expect(result.message).toContain("pnpm is unavailable");
+      expect(result.message).toContain("Available package managers: npm");
+      expect(result.message).toContain("Install pnpm");
+    }
+    expect(existsSync(directory)).toBe(false);
+  });
+
+  it("leaves an existing in-target project.json untouched when manager is unavailable", async () => {
+    const directory = makeTempDir("unavailable-in-target");
+    const configPath = join(directory, "project.json");
+    const contents = readFileSync(join(fixturesDir, "project-web.json"), "utf8");
+    writeFileSync(configPath, contents);
+
+    const result = await runInit({
+      directory,
+      config: configPath,
+      packageManagerAvailability: pnpmUnavailable,
+    });
+
+    expect(result.status).toBe("validation_error");
+    expect(readFileSync(configPath, "utf8")).toBe(contents);
+  });
+
+  it("allows a dry run and warns about an unavailable configured manager", async () => {
+    const directory = join(makeTempDir("dry-run-parent"), "new-project");
+    const result = await runInit({
+      directory,
+      config: join(fixturesDir, "project-web.json"),
+      dryRun: true,
+      packageManagerAvailability: pnpmUnavailable,
+    });
+
+    expect(result.status).toBe("dry_run");
+    if (result.status === "dry_run") {
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain("pnpm is unavailable");
+    }
+    expect(existsSync(directory)).toBe(false);
+  });
+
   it("returns dry-run plan for Tier A web config", async () => {
     const result = await runInit({
       directory: "./my-app",
@@ -133,6 +185,7 @@ describe("runInit", () => {
       dryRun: false,
       json: true,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
       bootstrapOptions: {
         bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
         simulateBootstrapOutput: true,
@@ -164,6 +217,7 @@ describe("runInit", () => {
       dryRun: false,
       json: true,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
       bootstrapOptions: {
         bootstrapRunner: async (step) => {
           if (step.id === "bootstrap-web") {
@@ -194,6 +248,7 @@ describe("runInit", () => {
       dryRun: false,
       json: true,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
       bootstrapOptions: {
         bootstrapRunner: async () => ({
           exitCode: 1,
@@ -218,6 +273,7 @@ describe("runInit", () => {
       dryRun: false,
       json: true,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
       bootstrapOptions: {
         bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
         simulateBootstrapOutput: true,
@@ -247,6 +303,7 @@ describe("buildInitPlan", () => {
         topology: "web",
         apps: ["web"],
         backend: "rest",
+        convexExample: false,
         auth: "clerk",
         i18n: { web: "gt-next" },
         ui: { web: "shadcn-base-ui" },

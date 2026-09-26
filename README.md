@@ -42,9 +42,18 @@ The wizard asks trajectory-changing questions first:
 3. Project type
 4. Expo runtime when the project contains mobile
 5. Authentication
-6. Compatible follow-up settings
-7. Locales when internationalization is enabled
-8. Final configuration review
+6. Backend
+7. Compatible follow-up settings, including the optional Convex example
+8. Locales when internationalization is enabled
+9. Final configuration review
+
+The wizard checks `pnpm --version`, `npm --version`, and `bun --version` and
+marks managers that cannot run as unavailable. It suggests the first available
+manager in that order. Choosing an unavailable manager stops creation before
+the target directory is changed; the same check applies to `project.json`
+configurations. Install the selected manager or choose one shown as available
+and try again. `--dry-run` still shows the plan and warns if the selected
+manager is unavailable.
 
 Choices that have only one supported answer are resolved automatically and
 shown in the final review. Later questions are filtered using earlier answers.
@@ -75,7 +84,7 @@ assets, and generated CAPTAIN context files.
 
 ## Supported stack
 
-- REST backend client
+- REST backend client or native Convex queries, mutations, and subscriptions
 - Clerk or no authentication
 - Authorization when Clerk is enabled
 - GT for Next.js
@@ -84,6 +93,11 @@ assets, and generated CAPTAIN context files.
 - shadcn with Base UI for web
 - NativeWind for mobile
 - pnpm, npm, and Bun
+
+Convex works with all three project types and with Expo Go or an Expo
+development build. A monorepo uses one shared Convex backend for web and
+mobile. CAPTAIN generates the integration without requiring a Convex account;
+connect a deployment afterward using the [Convex setup guide](docs/convex.md).
 
 Only implemented values are accepted by the wizard and JSON schema. Planned
 integrations are tracked in [ROADMAP.md](ROADMAP.md).
@@ -157,6 +171,29 @@ Monorepo example:
 }
 ```
 
+Convex example, with the optional working task list enabled:
+
+```json
+{
+  "name": "acme-convex",
+  "scope": "@acme",
+  "packageManager": "pnpm",
+  "topology": "web",
+  "backend": "convex",
+  "convexExample": true,
+  "auth": "clerk",
+  "i18n": "gt-next",
+  "ui": "shadcn-base-ui",
+  "locales": ["en"],
+  "defaultLocale": "en"
+}
+```
+
+`convexExample` defaults to `false` and is valid only with `"backend":
+"convex"`. When enabled, it adds a task list at a separate `/example` route;
+in a monorepo, both apps get the route and share the same data. Clerk users see
+their own tasks, while projects without authentication use a shared list.
+
 ## Options
 
 | Option | Purpose |
@@ -183,6 +220,11 @@ Generated projects include:
 - `project.json` with the resolved configuration
 - `CONTEXT.md` with the generated stack and layout
 - `.env.example` containing only relevant integration variables
+
+Convex projects also include client providers and Next.js server access where
+web is present. Before deployment variables are configured, the generated app
+shows a setup message. See the [Convex setup guide](docs/convex.md) for local
+and production configuration.
 
 Generated shared modules use direct file imports. Monorepo packages expose
 module subpaths such as `@acme/core/backend/http-client` instead of root barrel
