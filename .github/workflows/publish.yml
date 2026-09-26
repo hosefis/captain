@@ -82,6 +82,11 @@ jobs:
           [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || exit 1
           test "$RELEASE_TAG" = "v$(node -p "require('./package.json').version")"
       - run: pnpm install --frozen-lockfile
+      - name: Wait for the published version to reach npm
+        env:
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+          CAPTAIN_CANARY_ROOT: package-canary-output
+        run: node scripts/run-package-canary.mjs available "${RELEASE_TAG#v}"
       - name: Generate and validate from the npm registry package
         id: registry-canary
         env:
