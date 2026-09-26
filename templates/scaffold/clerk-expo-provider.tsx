@@ -1,12 +1,16 @@
 import { ClerkProvider } from "@clerk/expo";
-import * as SecureStore from "expo-secure-store";
+import { tokenCache } from "@clerk/expo/token-cache";
 import type { PropsWithChildren } from "react";
-
-const tokenCache = {
-  getToken: (key: string) => SecureStore.getItemAsync(key),
-  saveToken: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-};
+import { Text, View } from "react-native";
 
 export function CaptainAuthProvider({ children }: PropsWithChildren) {
-  return <ClerkProvider tokenCache={tokenCache}>{children}</ClerkProvider>;
+  const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+  if (!publishableKey) {
+    return (
+      <View style={{ flex: 1, padding: 24, justifyContent: "center" }}>
+        <Text>Set EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in .env.local, then restart Expo.</Text>
+      </View>
+    );
+  }
+  return <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>{children}</ClerkProvider>;
 }

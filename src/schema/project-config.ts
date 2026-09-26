@@ -54,6 +54,7 @@ export const projectConfigSchema = z
     topology: topologySchema,
     apps: z.array(appSchema).optional(),
     backend: backendSchema.default("rest"),
+    convexExample: z.boolean().default(false),
     auth: authSchema.default("clerk"),
     i18n: i18nInputSchema,
     ui: uiInputSchema,
@@ -63,6 +64,14 @@ export const projectConfigSchema = z
   })
   .strict()
   .superRefine((config, ctx) => {
+    if (config.convexExample && config.backend !== "convex") {
+      ctx.addIssue({
+        code: "custom",
+        message: "convexExample requires the Convex backend",
+        path: ["convexExample"],
+      });
+    }
+
     if (
       config.topology === "monorepo" &&
       config.apps !== undefined &&

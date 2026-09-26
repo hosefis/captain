@@ -18,7 +18,10 @@ export const SUPPORTED_OPTIONS = {
     { value: "dev-build", label: "Expo development build" },
     { value: "expo-go", label: "Expo Go" },
   ],
-  backends: [{ value: "rest", label: "REST API" }],
+  backends: [
+    { value: "rest", label: "REST API" },
+    { value: "convex", label: "Convex" },
+  ],
   authentication: [
     { value: "clerk", label: "Clerk" },
     { value: "none", label: "No authentication" },

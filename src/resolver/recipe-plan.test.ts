@@ -29,4 +29,11 @@ describe("resolveRecipePlan", () => {
     expect(ids).not.toContain("auth-clerk");
     expect(ids).not.toContain("module-authorization");
   });
+
+  it("applies Convex after provider-writing auth and UI recipes", () => {
+    const ids = resolveRecipePlan({ ...web(), backend: "convex" }).map((step) => step.id);
+    expect(ids).not.toContain("backend-rest");
+    expect(ids.at(-1)).toBe("backend-convex");
+    expect(ids.indexOf("backend-convex")).toBeGreaterThan(ids.indexOf("auth-clerk"));
+  });
 });

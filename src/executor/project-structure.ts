@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { copyTemplateTree } from "../generators/template.js";
 import { templatesDir } from "../lib/paths.js";
@@ -212,4 +212,32 @@ export function applyProjectStructure(
 
   patchMonorepoRoot(targetDir, config);
   emitPackageSkeletons(targetDir, config);
+  for (const app of config.apps) {
+    if (config.packageManager === "pnpm") {
+      const nestedWorkspacePath = join(targetDir, "apps", app, "pnpm-workspace.yaml");
+      if (existsSync(nestedWorkspacePath)) {
+        unlinkSync(nestedWorkspacePath);
+      }
+    }
+    const packagePath = join(targetDir, "apps", app, "package.json");
+    if (!existsSync(packagePath)) {
+      continue;
+    }
+    const manifest = JSON.parse(readFileSync(packagePath, "utf-8")) as {
+      scripts?: Record<string, string>;
+      [key: string]: unknown;
+    };
+    delete manifest.packageManager;
+    writeFileSync(
+      packagePath,
+      `${JSON.stringify({
+        ...manifest,
+        scripts: {
+          ...manifest.scripts,
+          typecheck: "tsc --noEmit",
+          ...(app === "mobile" ? { build: "expo export" } : {}),
+        },
+      }, null, 2)}\n`,
+    );
+  }
 }

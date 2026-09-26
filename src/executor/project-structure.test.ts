@@ -79,6 +79,11 @@ describe("applyProjectStructure", () => {
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
     const target = directory("monorepo");
+    mkdirSync(join(target, "apps/web"), { recursive: true });
+    mkdirSync(join(target, "apps/mobile"), { recursive: true });
+    writeFileSync(join(target, "apps/web/pnpm-workspace.yaml"), 'packages:\n  - "."\n');
+    writeFileSync(join(target, "apps/web/package.json"), '{"name":"web","packageManager":"pnpm@11.25.0","scripts":{"build":"next build"}}\n');
+    writeFileSync(join(target, "apps/mobile/package.json"), '{"name":"mobile","scripts":{"start":"expo start"}}\n');
 
     applyProjectStructure(config, target);
 
@@ -89,5 +94,11 @@ describe("applyProjectStructure", () => {
     expect(
       JSON.parse(readFileSync(join(target, "package.json"), "utf-8")).scripts.dev,
     ).toBe("turbo dev");
+    expect(existsSync(join(target, "apps/web/pnpm-workspace.yaml"))).toBe(false);
+    const web = JSON.parse(readFileSync(join(target, "apps/web/package.json"), "utf-8"));
+    const mobile = JSON.parse(readFileSync(join(target, "apps/mobile/package.json"), "utf-8"));
+    expect(web.packageManager).toBeUndefined();
+    expect(web.scripts.typecheck).toBe("tsc --noEmit");
+    expect(mobile.scripts.build).toBe("expo export");
   });
 });

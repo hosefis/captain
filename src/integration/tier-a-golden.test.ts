@@ -15,6 +15,7 @@ function tierABase(overrides: Partial<ProjectConfig>): ProjectConfig {
     packageManager: "pnpm",
     topology: "web",
     backend: "rest",
+    convexExample: false,
     auth: "clerk",
     i18n: "gt-next",
     ui: "shadcn-base-ui",
@@ -55,6 +56,35 @@ const tierAFixtures = [
         }),
       ),
     ),
+  },
+  {
+    id: "convex-web",
+    config: parseProjectConfig(tierABase({ backend: "convex", auth: "none" })),
+  },
+  {
+    id: "convex-expo-go-example",
+    config: parseProjectConfig(tierABase({
+      topology: "mobile",
+      runtime: "expo-go",
+      backend: "convex",
+      convexExample: true,
+      auth: "none",
+      i18n: "none",
+      ui: "nativewind",
+    })),
+  },
+  {
+    id: "convex-monorepo-example",
+    config: parseProjectConfig(tierABase({
+      topology: "monorepo",
+      apps: ["web", "mobile"],
+      runtime: "dev-build",
+      backend: "convex",
+      convexExample: true,
+      auth: "clerk",
+      i18n: { web: "gt-next", mobile: "gt-react-native" },
+      ui: { web: "shadcn-base-ui", mobile: "nativewind" },
+    })),
   },
 ] as const;
 

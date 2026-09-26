@@ -16,6 +16,7 @@ jobs:
       matrix:
         package-manager: [pnpm, npm, bun]
         topology: [web, mobile, monorepo]
+        backend: [rest, convex]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -27,12 +28,12 @@ jobs:
         if: matrix.package-manager == 'bun'
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - run: node scripts/run-live-matrix.mjs ${{ matrix.package-manager }} ${{ matrix.topology }}
+      - run: node scripts/run-live-matrix.mjs ${{ matrix.package-manager }} ${{ matrix.topology }} ${{ matrix.backend }}
         env:
           CAPTAIN_MATRIX_ROOT: matrix-output
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: ${{ matrix.package-manager }}-${{ matrix.topology }}-diagnostics
+          name: ${{ matrix.package-manager }}-${{ matrix.topology }}-${{ matrix.backend }}-diagnostics
           path: matrix-output
           if-no-files-found: warn

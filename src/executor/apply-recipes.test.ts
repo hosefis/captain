@@ -74,9 +74,12 @@ describe("standalone recipes", () => {
     expect(applyRecipes(config, directory).ok).toBe(true);
     const packageJson = JSON.parse(
       readFileSync(join(directory, "package.json"), "utf-8"),
-    ) as { dependencies: Record<string, string> };
-    expect(packageJson.dependencies["@clerk/expo"]).toBe("^2.11.0");
-    expect(packageJson.dependencies["expo-secure-store"]).toBe("^14.2.3");
+    ) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
+    expect(packageJson.dependencies["@clerk/expo"]).toBe("^4.7.1");
+    expect(packageJson.dependencies["expo-secure-store"]).toBe("^57.0.4");
+    expect(packageJson.dependencies["expo-auth-session"]).toBe("^57.0.13");
+    expect(packageJson.devDependencies["@babel/core"]).toBe("^7.29.7");
+    expect(packageJson.devDependencies["@babel/types"]).toBe("^7.29.8");
   });
 
   it("supports Expo Go with no i18n and no authentication", () => {
@@ -132,5 +135,87 @@ describe("monorepo recipes", () => {
     expect(
       readFileSync(join(directory, "packages/adapters-expo/src/backend/rest.ts"), "utf-8"),
     ).toContain('from "@acme/core/backend/client"');
+  });
+});
+
+describe("Convex recipes", () => {
+  it("generates web providers and server access without the optional example", () => {
+    const config = parseProjectConfig({
+      ...base,
+      backend: "convex",
+      topology: "web",
+      auth: "none",
+      i18n: "gt-next",
+      ui: "shadcn-base-ui",
+    });
+    const directory = tempDir("convex-web");
+    applyProjectStructure(config, directory);
+
+    expect(applyRecipes(config, directory)).toEqual(expect.objectContaining({ ok: true }));
+    expect(existsSync(join(directory, "convex/schema.ts"))).toBe(true);
+    expect(existsSync(join(directory, "convex/_generated/api.d.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/integrations/convex/server.ts"))).toBe(true);
+    expect(existsSync(join(directory, "src/app/example/page.tsx"))).toBe(false);
+    expect(existsSync(join(directory, "src/lib/backend/client.ts"))).toBe(false);
+    const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf-8")) as {
+      dependencies: Record<string, string>;
+      scripts: Record<string, string>;
+    };
+    expect(manifest.dependencies.convex).toBe("^1.46.0");
+    expect(manifest.scripts["convex:dev"]).toBe("convex dev");
+  });
+
+  it("generates an Expo Go public task example on a separate route", () => {
+    const config = parseProjectConfig({
+      ...base,
+      backend: "convex",
+      convexExample: true,
+      topology: "mobile",
+      runtime: "expo-go",
+      auth: "none",
+      i18n: "none",
+      ui: "nativewind",
+    });
+    const directory = tempDir("convex-mobile");
+    applyProjectStructure(config, directory);
+
+    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(existsSync(join(directory, "src/app/example.tsx"))).toBe(true);
+    expect(existsSync(join(directory, "src/app/sign-in.tsx"))).toBe(false);
+    expect(readFileSync(join(directory, "src/app/index.tsx"), "utf-8")).toContain("/example");
+    expect(readFileSync(join(directory, "src/app/example.tsx"), "utf-8")).toContain(
+      "../../convex/_generated/api",
+    );
+  });
+
+  it("shares one Clerk-protected backend across monorepo apps", () => {
+    const config = parseProjectConfig({
+      ...base,
+      backend: "convex",
+      convexExample: true,
+      topology: "monorepo",
+      apps: ["web", "mobile"],
+      runtime: "dev-build",
+      auth: "clerk",
+      i18n: { web: "gt-next", mobile: "gt-react-native" },
+      ui: { web: "shadcn-base-ui", mobile: "nativewind" },
+    });
+    const directory = tempDir("convex-monorepo");
+    applyProjectStructure(config, directory);
+
+    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(existsSync(join(directory, "packages/convex/convex/auth.config.ts"))).toBe(true);
+    expect(existsSync(join(directory, "packages/convex/convex/tasks.ts"))).toBe(true);
+    expect(existsSync(join(directory, "apps/web/src/app/example/page.tsx"))).toBe(true);
+    expect(existsSync(join(directory, "apps/mobile/src/app/example.tsx"))).toBe(true);
+    expect(existsSync(join(directory, "apps/mobile/src/app/sign-in.tsx"))).toBe(true);
+    expect(readFileSync(join(directory, "convex.json"), "utf-8")).toContain(
+      "packages/convex/convex/",
+    );
+    for (const app of ["web", "mobile"]) {
+      expect(readFileSync(join(directory, `apps/${app}/src/app/example${app === "web" ? "/page" : ""}.tsx`), "utf-8")).toContain(
+        "@acme/convex/_generated/api",
+      );
+    }
   });
 });
