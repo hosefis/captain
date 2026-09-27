@@ -525,6 +525,10 @@ function applyUiMobileNativewind(
       "eslint-config-expo": testedRange("eslint-config-expo"),
       "babel-preset-expo": testedRange("babel-preset-expo"),
       "@babel/core": testedRange("@babel/core"),
+      "@babel/plugin-transform-react-jsx": testedRange("@babel/plugin-transform-react-jsx"),
+      "@babel/plugin-transform-react-jsx-development": testedRange(
+        "@babel/plugin-transform-react-jsx-development",
+      ),
       "@babel/types": testedRange("@babel/types"),
     },
   });

@@ -72,6 +72,8 @@ describe("resolvePackagesForConfig", () => {
     expect(packages).toContain("create-expo-app");
     expect(packages).toContain("gt-react-native");
     expect(packages).toContain("nativewind");
+    expect(packages).toContain("@babel/plugin-transform-react-jsx");
+    expect(packages).toContain("@babel/plugin-transform-react-jsx-development");
     expect(packages).toContain("expo-localization");
   });
 
