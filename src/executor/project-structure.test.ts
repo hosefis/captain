@@ -98,6 +98,7 @@ describe("applyProjectStructure", () => {
       JSON.parse(readFileSync(join(target, "package.json"), "utf-8")).scripts.dev,
     ).toBe("turbo dev");
     expect(JSON.parse(readFileSync(join(target, "package.json"), "utf-8")).devDependencies.typescript).toBe("5.9.3");
+    expect(JSON.parse(readFileSync(join(target, "package.json"), "utf-8")).devDependencies["@babel/core"]).toBe("7.29.7");
     expect(JSON.parse(readFileSync(join(target, "packages/ui/package.json"), "utf-8")).devDependencies.typescript).toBe("5.9.3");
     expect(existsSync(join(target, "apps/web/pnpm-workspace.yaml"))).toBe(false);
     const web = JSON.parse(readFileSync(join(target, "apps/web/package.json"), "utf-8"));
