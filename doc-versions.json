@@ -70,6 +70,14 @@
       "validated": "7.29.7",
       "docs": "https://babeljs.io/docs/babel-core"
     },
+    "@babel/plugin-transform-react-jsx": {
+      "validated": "7.29.7",
+      "docs": "https://babeljs.io/docs/babel-plugin-transform-react-jsx"
+    },
+    "@babel/plugin-transform-react-jsx-development": {
+      "validated": "7.29.7",
+      "docs": "https://babeljs.io/docs/babel-plugin-transform-react-jsx-development"
+    },
     "@babel/types": {
       "validated": "7.29.8",
       "docs": "https://babeljs.io/docs/babel-types"

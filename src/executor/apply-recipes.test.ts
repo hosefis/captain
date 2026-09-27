@@ -79,6 +79,10 @@ describe("standalone recipes", () => {
     expect(packageJson.dependencies["expo-secure-store"]).toBe("^57.0.4");
     expect(packageJson.dependencies["expo-auth-session"]).toBe("^57.0.13");
     expect(packageJson.devDependencies["@babel/core"]).toBe("^7.29.7");
+    expect(packageJson.devDependencies["@babel/plugin-transform-react-jsx"]).toBe("^7.29.7");
+    expect(packageJson.devDependencies["@babel/plugin-transform-react-jsx-development"]).toBe(
+      "^7.29.7",
+    );
     expect(packageJson.devDependencies["@babel/types"]).toBe("^7.29.8");
   });
 
@@ -118,8 +122,17 @@ describe("monorepo recipes", () => {
     });
     const directory = tempDir("monorepo-direct-imports");
     applyProjectStructure(config, directory);
+    mkdirSync(join(directory, "apps/mobile"), { recursive: true });
+    writeFileSync(join(directory, "apps/mobile/package.json"), '{"name":"mobile"}\n');
 
     expect(applyRecipes(config, directory).ok).toBe(true);
+    const mobileManifest = JSON.parse(
+      readFileSync(join(directory, "apps/mobile/package.json"), "utf-8"),
+    ) as { devDependencies: Record<string, string> };
+    expect(mobileManifest.devDependencies["@babel/plugin-transform-react-jsx"]).toBe("^7.29.7");
+    expect(mobileManifest.devDependencies["@babel/plugin-transform-react-jsx-development"]).toBe(
+      "^7.29.7",
+    );
     for (const packageName of ["core", "adapters-next", "adapters-expo"]) {
       const packageDir = join(directory, "packages", packageName);
       const manifest = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf-8")) as {

@@ -112,6 +112,8 @@ export function resolvePackagesForConfig(config: NormalizedProjectConfig): strin
     packages.add("eslint-config-expo");
     packages.add("babel-preset-expo");
     packages.add("@babel/core");
+    packages.add("@babel/plugin-transform-react-jsx");
+    packages.add("@babel/plugin-transform-react-jsx-development");
     packages.add("@babel/types");
   }
 
