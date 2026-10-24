@@ -82,19 +82,8 @@ export function emitEnvExample(config: NormalizedProjectConfig, targetDir: strin
   }
 }
 
-export function emitProjectJson(config: NormalizedProjectConfig, targetDir: string): void {
-  const { stacks: _stacks, apps, ...rest } = config;
-  const serializable =
-    config.topology === "monorepo" ? { ...rest, apps } : rest;
-  writeFileSync(
-    join(targetDir, "project.json"),
-    `${JSON.stringify(serializable, null, 2)}\n`,
-    "utf-8",
-  );
-}
-
+/** Writes project onboarding documentation and environment variable examples. */
 export function applyConfigEmit(config: NormalizedProjectConfig, targetDir: string): void {
   emitContextMd(config, targetDir);
   emitEnvExample(config, targetDir);
-  emitProjectJson(config, targetDir);
 }

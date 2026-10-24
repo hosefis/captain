@@ -22,6 +22,7 @@ describe("resolveRecipePlan", () => {
     const plan = resolveRecipePlan(web());
     expect(plan.some((step) => step.id === "project-structure")).toBe(true);
     expect(plan.some((step) => step.id === "workspace-promote")).toBe(false);
+    expect(plan.some((step) => step.id === "project-json")).toBe(false);
   });
 
   it("omits auth and authorization when authentication is disabled", () => {

@@ -1,6 +1,6 @@
 # Convex setup
 
-CAPTAIN generated a Convex backend and native Convex clients. If you selected the optional task example, it lives at `/example` in each app. In a monorepo, web and mobile use the same backend and task data.
+The applications connect directly to the Convex backend. When included, the task example lives at `/example` in each app. In a monorepo, web and mobile use the same backend and task data.
 
 ## Local development
 

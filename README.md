@@ -80,7 +80,9 @@ src/
 ```
 
 The project root keeps framework configuration, dependency manifests, public
-assets, and generated CAPTAIN context files.
+assets, project documentation, and environment examples. Generated files use
+project and integration names without Captain branding. No scaffold configuration
+file is written to the project.
 
 ## Supported stack
 
@@ -105,6 +107,8 @@ integrations are tracked in [ROADMAP.md](ROADMAP.md).
 ## Config-file usage
 
 Use `--config` for repeatable or agent-driven generation:
+
+Create and maintain this input file separately; it is not emitted by scaffolding.
 
 ```bash
 create-captain my-app --config ./project.json --yes

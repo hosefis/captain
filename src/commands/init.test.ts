@@ -232,7 +232,7 @@ describe("runInit", () => {
 
     expect(result.status).toBe("success");
     expect(configWasStaged).toBe(true);
-    expect(existsSync(configPath)).toBe(true);
+    expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
   });
 
   it("restores an in-target project.json when bootstrap fails", async () => {

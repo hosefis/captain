@@ -1,8 +1,8 @@
 /**
  * ESLint rule config snippet — ban hardcoded toast/alert strings in UI code.
- * Merge into your ESLint flat config after CAPTAIN init.
+ * Merge into your ESLint flat config to enforce translated messages.
  */
-export const captainI18nEnforcement = {
+export const internationalizationEnforcement = {
   rules: {
     "no-restricted-syntax": [
       "warn",

@@ -1,12 +1,9 @@
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import { applyConfigEmit } from "./config-emit.js";
-import {
-  loadProjectConfigFromFile,
-  type NormalizedProjectConfig,
-} from "../schema/project-config.js";
+import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
 const config: NormalizedProjectConfig = {
   name: "acme-web",
@@ -25,7 +22,7 @@ const config: NormalizedProjectConfig = {
 };
 
 describe("applyConfigEmit", () => {
-  it("writes CONTEXT.md, .env.example, and project.json", () => {
+  it("writes project documentation and environment examples without scaffold configuration", () => {
     const targetDir = join(tmpdir(), `captain-config-${Date.now()}`);
     mkdirSync(targetDir, { recursive: true });
 
@@ -34,21 +31,24 @@ describe("applyConfigEmit", () => {
     const context = readFileSync(join(targetDir, "CONTEXT.md"), "utf-8");
     expect(context).toContain("acme-web");
     expect(context).toContain("@acme");
+    expect(context).not.toMatch(/captain|project\.json|compatibility\.json/i);
 
     const envExample = readFileSync(join(targetDir, ".env.example"), "utf-8");
     expect(envExample).toContain("DEFAULT_LOCALE=en");
+    expect(envExample).not.toMatch(/captain/i);
 
-    const projectJson = JSON.parse(readFileSync(join(targetDir, "project.json"), "utf-8")) as {
-      name: string;
-      scope: string;
-    };
-    expect(projectJson.name).toBe("acme-web");
-    expect(projectJson.scope).toBe("@acme");
-    expect("stacks" in projectJson).toBe(false);
-    expect("apps" in projectJson).toBe(false);
-    expect(loadProjectConfigFromFile(join(targetDir, "project.json")).apps).toEqual([
-      "web",
-    ]);
+    expect(existsSync(join(targetDir, "project.json"))).toBe(false);
+  });
+
+  it("preserves an existing project.json owned by the user", () => {
+    const targetDir = join(tmpdir(), `captain-config-existing-${Date.now()}`);
+    mkdirSync(targetDir, { recursive: true });
+    const contents = '{"customSetting":true}\n';
+    writeFileSync(join(targetDir, "project.json"), contents);
+
+    applyConfigEmit(config, targetDir);
+
+    expect(readFileSync(join(targetDir, "project.json"), "utf-8")).toBe(contents);
   });
 
   it("emits only Convex backend variables for a Convex project", () => {

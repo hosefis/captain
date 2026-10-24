@@ -208,7 +208,7 @@ function applyBackendConvex(
     const renderApp = (source: string, target: string): void =>
       renderModuleFile(`convex/${app === "web" ? "web" : "mobile"}/${source}`, join(sourceDir, target), appVars);
     const authVariant = config.auth === "clerk" ? "clerk" : "none";
-    renderApp(`provider-${authVariant}.tsx`, "integrations/convex/captain-convex-provider.tsx");
+    renderApp(`provider-${authVariant}.tsx`, "integrations/convex/convex-provider.tsx");
     renderApp("layout.tsx", app === "web" ? "app/layout.tsx" : "app/_layout.tsx");
     if (app === "web") {
       renderApp(`server-${authVariant}.ts`, "integrations/convex/server.ts");
@@ -270,7 +270,7 @@ function applyAuthClerk(
         appSourceDir(targetDir, config, "web"),
         "integrations",
         "auth",
-        "captain-auth-provider.tsx",
+        "authentication-provider.tsx",
       ),
       vars,
     );
@@ -305,7 +305,7 @@ function applyAuthClerk(
         appSourceDir(targetDir, config, "mobile"),
         "integrations",
         "auth",
-        "captain-auth-provider.tsx",
+        "authentication-provider.tsx",
       ),
       vars,
     );
@@ -538,7 +538,6 @@ const WORKSPACE_CONFIG_STEPS = new Set([
   "project-structure",
   "context-md",
   "env-example",
-  "project-json",
 ]);
 
 function applyRecipeStep(

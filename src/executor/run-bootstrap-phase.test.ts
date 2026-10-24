@@ -55,7 +55,8 @@ describe("runBootstrapPhase", () => {
     expect(existsSync(join(targetDir, "src", "features", "authorization", "types.ts"))).toBe(true);
     expect(existsSync(join(targetDir, "CONTEXT.md"))).toBe(true);
     expect(existsSync(join(targetDir, ".env.example"))).toBe(true);
-    expect(existsSync(join(targetDir, "project.json"))).toBe(true);
+    expect(existsSync(join(targetDir, "project.json"))).toBe(false);
+    expect(result.appliedRecipes).not.toContain("project-json");
     expect(readFileSync(join(targetDir, "package.json"), "utf-8")).toContain('"name": "acme-web"');
     expect(existsSync(join(targetDir, "src/lib/backend/client.ts"))).toBe(true);
     expect(existsSync(join(targetDir, "turbo.json"))).toBe(false);

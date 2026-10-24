@@ -13,7 +13,8 @@ function Connected({ children }: PropsWithChildren) {
   return <ConvexProviderWithClerk client={convex!} useAuth={useAuth}>{children}</ConvexProviderWithClerk>;
 }
 
-export function CaptainConvexProvider({ children }: PropsWithChildren) {
+/** Connects the application to its Convex deployment. */
+export function ConvexProvider({ children }: PropsWithChildren) {
   if (!convex || !publishableKey) {
     return (
       <main style={{ padding: 24 }}>

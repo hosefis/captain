@@ -181,13 +181,13 @@ export async function runBootstrapPhase(
     options.onProgress?.({
       status: "start",
       id: "config",
-      description: "Write CAPTAIN configuration",
+      description: "Write project documentation and environment examples",
     });
     applyConfigEmit(config, targetDirectory);
     options.onProgress?.({
       status: "complete",
       id: "config",
-      description: "Wrote CAPTAIN configuration",
+      description: "Wrote project documentation and environment examples",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Config emit failed";
@@ -263,7 +263,6 @@ export async function runBootstrapPhase(
       "project-structure",
       "context-md",
       "env-example",
-      "project-json",
       ...recipesResult.appliedRecipes,
     ],
   };

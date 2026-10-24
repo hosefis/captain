@@ -19,17 +19,12 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     {
       id: "context-md",
       phase: "config",
-      description: "Emit CONTEXT.md stub for agent/human onboarding",
+      description: "Write CONTEXT.md for developer and agent onboarding",
     },
     {
       id: "env-example",
       phase: "config",
       description: "Emit .env.example with selected integration placeholders",
-    },
-    {
-      id: "project-json",
-      phase: "config",
-      description: "Write project.json with resolved CAPTAIN config",
     },
   ];
 
