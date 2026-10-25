@@ -1,5 +1,5 @@
-import { readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { basename, join, relative } from "node:path";
 import { createRequire } from "node:module";
 import type ts from "typescript";
 
@@ -16,6 +16,11 @@ const starterFiles = new Set([
   "use-color-scheme.ts", "use-color-scheme.web.ts", "use-theme.ts", "use-theme-color.ts",
   "theme.ts", "Colors.ts", "button.tsx", "card.tsx", "code.tsx",
 ]);
+
+const turboLintPresets: Record<string, { subpath: string; sourceName: string; presetName: string }> = {
+  "packages/ui/eslint.config.mjs": { subpath: "./react-internal", sourceName: "react-internal.js", presetName: "config" },
+  "apps/docs/eslint.config.js": { subpath: "./next-js", sourceName: "next.js", presetName: "nextJsConfig" },
+};
 
 const intentByName: Record<string, string> = {
   Home: "Displays the application's starter home page.",
@@ -79,9 +84,48 @@ function isColorSchemeForward(statement: ts.Statement, compiler: typeof ts): boo
   return exports.length === 1 && exports[0]!.name.text === "useColorScheme" && !exports[0]!.propertyName && !exports[0]!.isTypeOnly;
 }
 
-function documentFile(filePath: string, compiler: typeof ts): void {
+function turboPresetForward(filePath: string, directory: string, source: ts.SourceFile, compiler: typeof ts): ts.ExportAssignment | undefined {
+  const relativePath = relative(directory, filePath).replace(/\\/g, "/");
+  const preset = Object.hasOwn(turboLintPresets, relativePath) ? turboLintPresets[relativePath] : undefined;
+  if (!preset || source.statements.length !== 2) return undefined;
+  const [imported, exported] = source.statements;
+  if (!imported || !compiler.isImportDeclaration(imported) || !compiler.isStringLiteral(imported.moduleSpecifier)) return undefined;
+  if (imported.moduleSpecifier.text !== `@repo/eslint-config/${preset.subpath.slice(2)}` || imported.importClause?.isTypeOnly || imported.importClause?.name) return undefined;
+  const bindings = imported.importClause?.namedBindings;
+  if (!bindings || !compiler.isNamedImports(bindings) || bindings.elements.length !== 1) return undefined;
+  const binding = bindings.elements[0]!;
+  if (binding.name.text !== preset.presetName || binding.propertyName || binding.isTypeOnly) return undefined;
+  if (!exported || !compiler.isExportAssignment(exported) || exported.isExportEquals) return undefined;
+  if (!compiler.isIdentifier(exported.expression) || exported.expression.text !== preset.presetName) return undefined;
+
+  const providerDirectory = join(directory, "packages/eslint-config");
+  const manifestPath = join(providerDirectory, "package.json");
+  const providerPath = join(providerDirectory, preset.sourceName);
+  if (!existsSync(manifestPath) || !existsSync(providerPath)) return undefined;
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as { name?: string; exports?: Record<string, unknown> };
+  if (manifest.name !== "@repo/eslint-config" || manifest.exports?.[preset.subpath] !== `./${preset.sourceName}`) return undefined;
+  const provider = compiler.createSourceFile(providerPath, readFileSync(providerPath, "utf-8"), compiler.ScriptTarget.Latest, true);
+  const exportsArray = provider.statements.some((statement) => {
+    if (!compiler.isVariableStatement(statement) || !statement.modifiers?.some((modifier) => modifier.kind === compiler.SyntaxKind.ExportKeyword)) return false;
+    if (!(statement.declarationList.flags & compiler.NodeFlags.Const)) return false;
+    return statement.declarationList.declarations.some((declaration) =>
+      compiler.isIdentifier(declaration.name) && declaration.name.text === preset.presetName &&
+      declaration.initializer !== undefined && compiler.isArrayLiteralExpression(declaration.initializer));
+  });
+  return exportsArray ? exported : undefined;
+}
+
+function documentFile(filePath: string, compiler: typeof ts, directory: string): void {
   const contents = readFileSync(filePath, "utf-8");
   const source = compiler.createSourceFile(filePath, contents, compiler.ScriptTarget.Latest, true);
+  if (Object.hasOwn(turboLintPresets, relative(directory, filePath).replace(/\\/g, "/"))) {
+    const forwardedPreset = turboPresetForward(filePath, directory, source, compiler);
+    if (!forwardedPreset) return;
+    const expression = forwardedPreset.expression;
+    const prepared = contents.slice(0, expression.getStart(source)) + `[...${expression.getText(source)}]` + contents.slice(expression.end);
+    writeFileSync(filePath, prepared, "utf-8");
+    return;
+  }
   const insertions: Array<{ start: number; end: number; text: string }> = [];
   const newline = contents.includes("\r\n") ? "\r\n" : "\n";
 
@@ -110,17 +154,20 @@ function documentFile(filePath: string, compiler: typeof ts): void {
 /** Finds editable framework starter files before integration recipes emit their own documented source. */
 export function findStarterSourceFiles(directory: string): string[] {
   const files: string[] = [];
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (entry.name === "_generated" && directory.split(/[\\/]/).includes("convex")) continue;
-    if (entry.isDirectory() && !ignoredDirectories.has(entry.name)) {
-      files.push(...findStarterSourceFiles(join(directory, entry.name)));
+  const visit = (currentDirectory: string): void => {
+    for (const entry of readdirSync(currentDirectory, { withFileTypes: true })) {
+      if (entry.name === "_generated" && currentDirectory.split(/[\\/]/).includes("convex")) continue;
+      const filePath = join(currentDirectory, entry.name);
+      if (entry.isDirectory() && !ignoredDirectories.has(entry.name)) visit(filePath);
+      const relativePath = relative(directory, filePath).replace(/\\/g, "/");
+      if (entry.isFile() && (starterFiles.has(entry.name) || Object.hasOwn(turboLintPresets, relativePath))) files.push(filePath);
     }
-    if (entry.isFile() && starterFiles.has(entry.name)) files.push(join(directory, entry.name));
-  }
+  };
+  visit(directory);
   return files;
 }
 
-/** Documents recognized framework starter exports using the installed project compiler only when needed. */
+/** Prepares recognized starter exports and composes Turbo lint presets using the installed compiler when needed. */
 export function documentStarterSource(
   directory: string,
   compiler?: typeof ts,
@@ -128,5 +175,5 @@ export function documentStarterSource(
 ): void {
   if (sourceFiles.length === 0) return;
   const installedCompiler = compiler ?? createRequire(join(directory, "package.json"))("typescript") as typeof ts;
-  for (const filePath of sourceFiles) documentFile(filePath, installedCompiler);
+  for (const filePath of sourceFiles) documentFile(filePath, installedCompiler, directory);
 }

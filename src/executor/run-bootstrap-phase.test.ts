@@ -37,6 +37,51 @@ function createTemporaryDirectory(): string {
 }
 
 describe("runBootstrapPhase", () => {
+  it.each([false, true])("composes captured Turbo lint presets after install with enforcement %j", async (enforceCodeStandards) => {
+    const directory = createTemporaryDirectory();
+    const originalConfigurations = {
+      "packages/ui/eslint.config.mjs": 'import { config } from "@repo/eslint-config/react-internal";\nexport default config;\n',
+      "apps/docs/eslint.config.js": 'import { nextJsConfig } from "@repo/eslint-config/next-js";\nexport default nextJsConfig;\n',
+    };
+    const configuration: NormalizedProjectConfiguration = {
+      ...webConfiguration, topology: "monorepo", apps: ["web"], enforceCodeStandards,
+    };
+    const result = await runBootstrapPhase(configuration, directory, {
+      simulateBootstrapOutput: true,
+      starterCompiler: ts,
+      bootstrapRunner: async (step) => {
+        if (step.id === "bootstrap-monorepo") {
+          const providerDirectory = join(directory, "packages/eslint-config");
+          mkdirSync(providerDirectory, { recursive: true });
+          writeFileSync(join(providerDirectory, "package.json"), JSON.stringify({
+            name: "@repo/eslint-config", exports: { "./react-internal": "./react-internal.js", "./next-js": "./next.js" },
+          }));
+          writeFileSync(join(providerDirectory, "react-internal.js"), 'export const config = [{ rules: { "no-console": "error" } }];\n');
+          writeFileSync(join(providerDirectory, "next.js"), 'export const nextJsConfig = [{ rules: { "no-console": "error" } }];\n');
+          for (const [relativePath, contents] of Object.entries(originalConfigurations)) {
+            const filePath = join(directory, relativePath);
+            mkdirSync(join(filePath, ".."), { recursive: true });
+            writeFileSync(filePath, contents);
+          }
+        }
+        if (step.id === "install-root") {
+          for (const [relativePath, contents] of Object.entries(originalConfigurations)) {
+            expect(readFileSync(join(directory, relativePath), "utf-8")).toBe(contents);
+          }
+        }
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    });
+    expect(result).toMatchObject({ ok: true, appliedRecipes: expect.arrayContaining(["starter-documentation"]) });
+    expect(readFileSync(join(directory, "packages/ui/eslint.config.mjs"), "utf-8")).toBe(
+      originalConfigurations["packages/ui/eslint.config.mjs"].replace("export default config", "export default [...config]"),
+    );
+    expect(readFileSync(join(directory, "apps/docs/eslint.config.js"), "utf-8")).toBe(
+      originalConfigurations["apps/docs/eslint.config.js"].replace("export default nextJsConfig", "export default [...nextJsConfig]"),
+    );
+    expect(existsSync(join(directory, "tools/check-code-standards.mjs"))).toBe(enforceCodeStandards);
+  });
+
   it.each([
     { topology: "mobile", enabled: false },
     { topology: "mobile", enabled: true },
