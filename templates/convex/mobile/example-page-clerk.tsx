@@ -42,7 +42,7 @@ function Tasks() {
   );
 }
 
-/** Render the signed-in user task example. */
+/** Displays the live Convex task list and its editing controls. */
 export default function ExamplePage() {
   return (
     <ScrollView contentContainerStyle={{ padding: 24, gap: 12 }}>

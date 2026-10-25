@@ -16,7 +16,7 @@ const prompts = vi.hoisted(() => ({
 
 vi.mock("@clack/prompts", () => ({
   ...prompts,
-  isCancel: () => false,
+  isCancel: (value: unknown) => typeof value === "symbol",
 }));
 
 beforeEach(() => {
@@ -46,7 +46,8 @@ describe("runWizard backend selection", () => {
       expect(result.config.backend).toBe("rest");
       expect(result.config.convexExample).toBe(false);
     }
-    expect(prompts.confirm).not.toHaveBeenCalled();
+    expect(prompts.confirm).toHaveBeenCalledOnce();
+    expect(prompts.confirm).toHaveBeenCalledWith({ message: "Enforce code standards during lint?", initialValue: false });
     expect(prompts.note.mock.calls[0]?.[0]).toContain("Convex example: no");
   });
 
@@ -65,6 +66,24 @@ describe("runWizard backend selection", () => {
       initialValue: false,
     });
     expect(prompts.note.mock.calls[0]?.[0]).toContain("Convex example: yes");
+  });
+});
+
+describe("runWizard code standards", () => {
+  it.each([false, true])("retains the enforcement choice %j in configuration and summary", async (enabled) => {
+    prompts.select.mockResolvedValueOnce("rest").mockResolvedValueOnce("en");
+    prompts.confirm.mockResolvedValueOnce(enabled);
+    const result = await runWizard({ yes: true, packageManagerAvailability: allAvailable });
+    expect("config" in result && result.config.enforceCodeStandards).toBe(enabled);
+    expect(prompts.note.mock.calls[0]?.[0]).toContain(`Code standards enforcement: ${enabled ? "yes" : "no"}`);
+  });
+
+  it("cancels before the final review when the standards question is cancelled", async () => {
+    prompts.select.mockResolvedValueOnce("rest").mockResolvedValueOnce("en");
+    prompts.confirm.mockResolvedValueOnce(Symbol("cancel"));
+    expect(await runWizard({ yes: true, packageManagerAvailability: allAvailable })).toEqual({ cancelled: true });
+    expect(prompts.note).not.toHaveBeenCalled();
+    expect(prompts.cancel).toHaveBeenCalledWith("Init cancelled.");
   });
 });
 

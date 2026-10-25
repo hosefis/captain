@@ -54,7 +54,7 @@ function Tasks() {
   );
 }
 
-/** Render the signed-in user task example. */
+/** Displays the live Convex task list and its editing controls. */
 export default function ExamplePage() {
   return (
     <main style={{ maxWidth: 640, margin: "2rem auto", padding: 16 }}>

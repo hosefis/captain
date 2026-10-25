@@ -1,28 +1,30 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server.js";
 
-// In an unauthenticated project, this list is shared by everyone using the app.
+/** Lists tasks shared by everyone using the application. */
 export const list = query({
   args: {},
-  handler: async (ctx) => ctx.db.query("tasks").order("desc").collect(),
+  handler: async (context) => context.db.query("tasks").order("desc").collect(),
 });
 
+/** Creates a shared task after validating its text. */
 export const add = mutation({
   args: { text: v.string() },
-  handler: async (ctx, args) => {
-    const text = args.text.trim();
+  handler: async (context, taskInput) => {
+    const text = taskInput.text.trim();
     if (!text || text.length > 200) {
       throw new Error("Task text must be between 1 and 200 characters.");
     }
-    return ctx.db.insert("tasks", { text, completed: false });
+    return context.db.insert("tasks", { text, completed: false });
   },
 });
 
+/** Changes completion state for an existing shared task. */
 export const setCompleted = mutation({
   args: { id: v.id("tasks"), completed: v.boolean() },
-  handler: async (ctx, args) => {
-    const task = await ctx.db.get(args.id);
+  handler: async (context, taskInput) => {
+    const task = await context.db.get(taskInput.id);
     if (!task) throw new Error("Task not found.");
-    await ctx.db.patch(args.id, { completed: args.completed });
+    await context.db.patch(taskInput.id, { completed: taskInput.completed });
   },
 });

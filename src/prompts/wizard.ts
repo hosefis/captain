@@ -1,11 +1,11 @@
-import * as p from "@clack/prompts";
+import * as prompts from "@clack/prompts";
 import {
   detectPackageManagers,
   type PackageManagerAvailability,
 } from "../lib/package-manager-availability.js";
 import {
   parseProjectConfig,
-  type Auth,
+  type Authentication,
   type Backend,
   type ExpoRuntime,
   type NormalizedProjectConfig,
@@ -38,14 +38,14 @@ function unavailableMessage(
 }
 
 function cancelIfNeeded<T>(value: T | symbol): value is symbol {
-  if (p.isCancel(value)) {
-    p.cancel("Init cancelled.");
+  if (prompts.isCancel(value)) {
+    prompts.cancel("Init cancelled.");
     return true;
   }
   return false;
 }
 
-/** Derive a valid npm scope from a project name. */
+/** Derives the workspace package scope from the project name. */
 export function deriveScopeFromProjectName(name: string): string {
   return `@${name.trim().toLowerCase()}`;
 }
@@ -59,7 +59,7 @@ async function selectSupported(
     return options[0]!.value;
   }
 
-  return p.select<string>({
+  return prompts.select<string>({
     message,
     options: options.map((option) => ({
       value: option.value,
@@ -82,6 +82,7 @@ function summary(config: NormalizedProjectConfig): string {
     `Authentication: ${config.auth}`,
     `Backend: ${config.backend}`,
     `Convex example: ${config.convexExample ? "yes" : "no"}`,
+    `Code standards enforcement: ${config.enforceCodeStandards ? "yes" : "no"}`,
     `Web i18n: ${config.i18n.web ?? "n/a"}`,
     `Mobile i18n: ${config.i18n.mobile ?? "n/a"}`,
     `Web UI: ${config.ui.web ?? "n/a"}`,
@@ -96,7 +97,7 @@ function summary(config: NormalizedProjectConfig): string {
   return lines.join("\n");
 }
 
-/** Collect and confirm a supported project configuration interactively. */
+/** Collects compatible scaffold choices and confirms the resolved configuration. */
 export async function runWizard(
   options: {
     yes?: boolean;
@@ -111,9 +112,9 @@ export async function runWizard(
       error: "No package manager passed its version check. Install pnpm, npm, or bun and retry.",
     };
   }
-  p.intro("CAPTAIN — Create Apps Properly");
+  prompts.intro("CAPTAIN — Create Apps Properly");
 
-  const name = await p.text({
+  const name = await prompts.text({
     message: "Project name (kebab-case)",
     placeholder: "acme-platform",
     validate: (value) => {
@@ -149,7 +150,7 @@ export async function runWizard(
     if (!options.dryRun) {
       return { error: message };
     }
-    p.log.warn(`Dry run only: ${message} A real run would stop here.`);
+    prompts.log.warn(`Dry run only: ${message} A real run would stop here.`);
   }
 
   const topology = await selectSupported(
@@ -177,12 +178,12 @@ export async function runWizard(
     runtime = selectedRuntime as ExpoRuntime;
   }
 
-  const auth = await selectSupported(
+  const authentication = await selectSupported(
     "Authentication",
     SUPPORTED_OPTIONS.authentication,
     "clerk",
   );
-  if (cancelIfNeeded(auth)) {
+  if (cancelIfNeeded(authentication)) {
     return { cancelled: true };
   }
 
@@ -197,7 +198,7 @@ export async function runWizard(
 
   let convexExample = false;
   if (backend === "convex") {
-    const selectedExample = await p.confirm({
+    const selectedExample = await prompts.confirm({
       message: "Include a working Convex task list example?",
       initialValue: false,
     });
@@ -207,21 +208,21 @@ export async function runWizard(
     convexExample = selectedExample;
   }
 
-  const mobileI18n = runtime
+  const mobileInternationalization = runtime
     ? (await selectSupported(
         "Mobile internationalization",
         compatibleMobileI18n(runtime),
       ))
     : undefined;
-  if (mobileI18n !== undefined && cancelIfNeeded(mobileI18n)) {
+  if (mobileInternationalization !== undefined && cancelIfNeeded(mobileInternationalization)) {
     return { cancelled: true };
   }
 
-  const hasI18n = hasWeb || mobileI18n !== "none";
+  const hasInternationalization = hasWeb || mobileInternationalization !== "none";
   let locales = ["en", "fr"];
   let defaultLocale = "en";
-  if (hasI18n) {
-    const localesInput = await p.text({
+  if (hasInternationalization) {
+    const localesInput = await prompts.text({
       message: "Locales (comma-separated)",
       placeholder: "en, fr",
       initialValue: "en, fr",
@@ -238,15 +239,23 @@ export async function runWizard(
       .map((entry) => entry.trim())
       .filter(Boolean);
 
-    const selectedDefault = await p.select({
+    const selectedDefaultLocale = await prompts.select({
       message: "Default locale",
       options: locales.map((locale) => ({ value: locale, label: locale })),
       initialValue: locales[0],
     });
-    if (cancelIfNeeded(selectedDefault)) {
+    if (cancelIfNeeded(selectedDefaultLocale)) {
       return { cancelled: true };
     }
-    defaultLocale = selectedDefault;
+    defaultLocale = selectedDefaultLocale;
+  }
+
+  const enforceCodeStandards = await prompts.confirm({
+    message: "Enforce code standards during lint?",
+    initialValue: false,
+  });
+  if (cancelIfNeeded(enforceCodeStandards)) {
+    return { cancelled: true };
   }
 
   const config = parseProjectConfig({
@@ -256,16 +265,17 @@ export async function runWizard(
     topology: topology as Topology,
     backend: backend as Backend,
     convexExample,
-    auth: auth as Auth,
+    enforceCodeStandards,
+    auth: authentication as Authentication,
     i18n:
       topology === "monorepo"
         ? {
             web: SUPPORTED_OPTIONS.webI18n[0].value,
-            mobile: mobileI18n,
+            mobile: mobileInternationalization,
           }
         : topology === "web"
           ? SUPPORTED_OPTIONS.webI18n[0].value
-          : mobileI18n,
+          : mobileInternationalization,
     ui:
       topology === "monorepo"
         ? {
@@ -280,18 +290,18 @@ export async function runWizard(
     runtime,
   });
 
-  p.note(summary(config), "Configuration");
+  prompts.note(summary(config), "Configuration");
   if (!options.yes) {
-    const confirmed = await p.confirm({
+    const confirmed = await prompts.confirm({
       message: "Create this project?",
       initialValue: true,
     });
     if (cancelIfNeeded(confirmed) || !confirmed) {
-      p.cancel("Init cancelled.");
+      prompts.cancel("Init cancelled.");
       return { cancelled: true };
     }
   }
 
-  p.outro("Configuration confirmed");
+  prompts.outro("Configuration confirmed");
   return { cancelled: false, config };
 }

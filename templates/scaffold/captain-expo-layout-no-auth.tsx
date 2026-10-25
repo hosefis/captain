@@ -1,7 +1,7 @@
 import { Stack } from "expo-router";
 import "../global.css";
 
-/** Provide application integration context around routed content. */
+/** Wraps application routes with the selected providers and root layout. */
 export default function RootLayout() {
   return <Stack />;
 }

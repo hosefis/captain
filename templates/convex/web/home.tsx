@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-/** Render project onboarding and the Convex example link. */
+/** Displays project onboarding and links to the Convex example. */
 export default function HomePage() {
   return (
     <main style={{ maxWidth: 640, margin: "2rem auto", padding: 16 }}>

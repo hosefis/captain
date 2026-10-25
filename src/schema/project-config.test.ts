@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseProjectConfig } from "./project-config.js";
+import { parseProjectConfig, projectConfigJsonSchema } from "./project-config.js";
 
 const webConfig = {
   name: "sample-app",
@@ -8,6 +8,23 @@ const webConfig = {
   i18n: "gt-next",
   ui: "shadcn-base-ui",
 } as const;
+
+describe("optional standards configuration", () => {
+  it("supports older configurations with enforcement disabled", () => {
+    expect(parseProjectConfig(webConfig).enforceCodeStandards).toBe(false);
+  });
+
+  it.each([false, true])("retains explicit enforcement %j", (enabled) => {
+    expect(parseProjectConfig({ ...webConfig, enforceCodeStandards: enabled }).enforceCodeStandards).toBe(enabled);
+  });
+
+  it("publishes the optional boolean and default in the JSON schema", () => {
+    const schema = projectConfigJsonSchema();
+    expect((schema.properties as Record<string, unknown>).enforceCodeStandards).toEqual({ type: "boolean", default: false });
+    expect(schema.required).not.toContain("enforceCodeStandards");
+    expect(() => parseProjectConfig({ ...webConfig, enforceCodeStandards: "true" })).toThrow();
+  });
+});
 
 describe("Convex project config", () => {
   it("keeps REST as the default and disables the example", () => {

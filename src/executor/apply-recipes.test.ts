@@ -1,17 +1,24 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { parseProjectConfig } from "../schema/project-config.js";
 import { applyProjectStructure } from "./project-structure.js";
 import { applyRecipes } from "./apply-recipes.js";
 
-function tempDir(label: string): string {
+const generatedDirectories: string[] = [];
+
+afterEach(() => {
+  for (const directory of generatedDirectories.splice(0)) rmSync(directory, { recursive: true, force: true });
+});
+
+function createProjectDirectory(label: string): string {
   const directory = join(
     tmpdir(),
     `captain-recipes-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   );
   mkdirSync(directory, { recursive: true });
+  generatedDirectories.push(directory);
   writeFileSync(
     join(directory, "package.json"),
     `${JSON.stringify({ name: label, scripts: {} }, null, 2)}\n`,
@@ -29,6 +36,19 @@ const base = {
 } as const;
 
 describe("standalone recipes", () => {
+  it.each(["js", "mjs", "cjs", "ts", "mts", "cts"])("preserves custom Expo framework lint configuration in %s", (extension) => {
+    const config = parseProjectConfig({ ...base, topology: "mobile", runtime: "expo-go", auth: "none", i18n: "none", ui: "nativewind" });
+    const directory = createProjectDirectory("mobile-preserved-eslint");
+    applyProjectStructure(config, directory);
+    const configuration = '[{ rules: { "no-console": "error" } }]';
+    const original = ["js", "cjs", "cts"].includes(extension)
+      ? `// Application-owned rules.\r\nmodule.exports = ${configuration};`
+      : `// Application-owned rules.\r\nexport default ${configuration};`;
+    writeFileSync(join(directory, `eslint.config.${extension}`), original);
+    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(readFileSync(join(directory, `eslint.config.${extension}`), "utf-8")).toBe(original);
+    expect(existsSync(join(directory, "eslint.config.js"))).toBe(extension === "js");
+  });
   it("emits Next.js code into framework-native src directories", () => {
     const config = parseProjectConfig({
       ...base,
@@ -37,7 +57,7 @@ describe("standalone recipes", () => {
       i18n: "gt-next",
       ui: "shadcn-base-ui",
     });
-    const directory = tempDir("web");
+    const directory = createProjectDirectory("web");
     applyProjectStructure(config, directory);
 
     expect(applyRecipes(config, directory).ok).toBe(true);
@@ -53,10 +73,10 @@ describe("standalone recipes", () => {
     expect(existsSync(join(directory, "src/app/layout.tsx"))).toBe(true);
     expect(existsSync(join(directory, "turbo.json"))).toBe(false);
     expect(existsSync(join(directory, "packages"))).toBe(false);
-    const packageJson = JSON.parse(
+    const manifest = JSON.parse(
       readFileSync(join(directory, "package.json"), "utf-8"),
     ) as { dependencies: Record<string, string> };
-    expect(packageJson.dependencies["@clerk/nextjs"]).toBe("^6.22.0");
+    expect(manifest.dependencies["@clerk/nextjs"]).toBe("^6.22.0");
   });
 
   it("adds Clerk's Expo runtime dependencies before installation", () => {
@@ -68,22 +88,22 @@ describe("standalone recipes", () => {
       i18n: "gt-react-native",
       ui: "nativewind",
     });
-    const directory = tempDir("mobile-clerk");
+    const directory = createProjectDirectory("mobile-clerk");
     applyProjectStructure(config, directory);
 
     expect(applyRecipes(config, directory).ok).toBe(true);
-    const packageJson = JSON.parse(
+    const manifest = JSON.parse(
       readFileSync(join(directory, "package.json"), "utf-8"),
     ) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
-    expect(packageJson.dependencies["@clerk/expo"]).toBe("^4.7.1");
-    expect(packageJson.dependencies["expo-secure-store"]).toBe("^57.0.4");
-    expect(packageJson.dependencies["expo-auth-session"]).toBe("^57.0.13");
-    expect(packageJson.devDependencies["@babel/core"]).toBe("^7.29.7");
-    expect(packageJson.devDependencies["@babel/plugin-transform-react-jsx"]).toBe("^7.29.7");
-    expect(packageJson.devDependencies["@babel/plugin-transform-react-jsx-development"]).toBe(
+    expect(manifest.dependencies["@clerk/expo"]).toBe("^4.7.1");
+    expect(manifest.dependencies["expo-secure-store"]).toBe("^57.0.4");
+    expect(manifest.dependencies["expo-auth-session"]).toBe("^57.0.13");
+    expect(manifest.devDependencies["@babel/core"]).toBe("^7.29.7");
+    expect(manifest.devDependencies["@babel/plugin-transform-react-jsx"]).toBe("^7.29.7");
+    expect(manifest.devDependencies["@babel/plugin-transform-react-jsx-development"]).toBe(
       "^7.29.7",
     );
-    expect(packageJson.devDependencies["@babel/types"]).toBe("^7.29.8");
+    expect(manifest.devDependencies["@babel/types"]).toBe("^7.29.8");
   });
 
   it("supports Expo Go with no i18n and no authentication", () => {
@@ -95,7 +115,7 @@ describe("standalone recipes", () => {
       i18n: "none",
       ui: "nativewind",
     });
-    const directory = tempDir("mobile");
+    const directory = createProjectDirectory("mobile");
     applyProjectStructure(config, directory);
 
     const result = applyRecipes(config, directory);
@@ -120,7 +140,7 @@ describe("monorepo recipes", () => {
       i18n: { web: "gt-next", mobile: "gt-react-native" },
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
-    const directory = tempDir("monorepo-direct-imports");
+    const directory = createProjectDirectory("monorepo-direct-imports");
     applyProjectStructure(config, directory);
     mkdirSync(join(directory, "apps/mobile"), { recursive: true });
     writeFileSync(join(directory, "apps/mobile/package.json"), '{"name":"mobile"}\n');
@@ -161,7 +181,7 @@ describe("Convex recipes", () => {
       i18n: "gt-next",
       ui: "shadcn-base-ui",
     });
-    const directory = tempDir("convex-web");
+    const directory = createProjectDirectory("convex-web");
     applyProjectStructure(config, directory);
 
     expect(applyRecipes(config, directory)).toEqual(expect.objectContaining({ ok: true }));
@@ -189,7 +209,7 @@ describe("Convex recipes", () => {
       i18n: "none",
       ui: "nativewind",
     });
-    const directory = tempDir("convex-mobile");
+    const directory = createProjectDirectory("convex-mobile");
     applyProjectStructure(config, directory);
 
     expect(applyRecipes(config, directory).ok).toBe(true);
@@ -213,7 +233,7 @@ describe("Convex recipes", () => {
       i18n: { web: "gt-next", mobile: "gt-react-native" },
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
-    const directory = tempDir("convex-monorepo");
+    const directory = createProjectDirectory("convex-monorepo");
     applyProjectStructure(config, directory);
 
     expect(applyRecipes(config, directory).ok).toBe(true);

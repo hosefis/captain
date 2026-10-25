@@ -6,21 +6,31 @@ import {
   SUPPORTED_OPTIONS,
 } from "../supported-options.js";
 
+/** Supported package managers accepted by scaffold configuration. */
 export const packageManagerSchema = z.enum(
   optionValues(SUPPORTED_OPTIONS.packageManagers),
 );
+/** Supported standalone and workspace project layouts. */
 export const topologySchema = z.enum(optionValues(SUPPORTED_OPTIONS.topologies));
+/** Application platforms supported by the scaffold. */
 export const appSchema = z.enum(["web", "mobile"]);
+/** Implemented backend integrations accepted by the scaffold. */
 export const backendSchema = z.enum(optionValues(SUPPORTED_OPTIONS.backends));
-export const authSchema = z.enum(
+/** Authentication integrations accepted by scaffold configuration. */
+export const authenticationSchema = z.enum(
   optionValues(SUPPORTED_OPTIONS.authentication),
 );
-export const i18nWebSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webI18n));
-export const i18nMobileSchema = z.enum(
+/** Translation integrations supported by web applications. */
+export const webInternationalizationSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webI18n));
+/** Translation integrations supported by mobile applications. */
+export const mobileInternationalizationSchema = z.enum(
   optionValues(SUPPORTED_OPTIONS.mobileI18n),
 );
-export const uiWebSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webUi));
-export const uiMobileSchema = z.enum(optionValues(SUPPORTED_OPTIONS.mobileUi));
+/** User interface integrations supported by web applications. */
+export const webUserInterfaceSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webUi));
+/** User interface integrations supported by mobile applications. */
+export const mobileUserInterfaceSchema = z.enum(optionValues(SUPPORTED_OPTIONS.mobileUi));
+/** Expo runtimes supported by mobile scaffolding. */
 export const expoRuntimeSchema = z.enum(
   optionValues(SUPPORTED_OPTIONS.runtimes),
 );
@@ -29,19 +39,20 @@ const scopeSchema = z
   .string()
   .regex(/^@[a-z0-9-]+$/i, "scope must be an npm scope like @acme");
 
-const i18nStackSchema = z.object({
-  web: i18nWebSchema.optional(),
-  mobile: i18nMobileSchema.optional(),
+const internationalizationStackSchema = z.object({
+  web: webInternationalizationSchema.optional(),
+  mobile: mobileInternationalizationSchema.optional(),
 });
 
-const uiStackSchema = z.object({
-  web: uiWebSchema.optional(),
-  mobile: uiMobileSchema.optional(),
+const userInterfaceStackSchema = z.object({
+  web: webUserInterfaceSchema.optional(),
+  mobile: mobileUserInterfaceSchema.optional(),
 });
 
-const i18nInputSchema = z.union([i18nWebSchema, i18nMobileSchema, i18nStackSchema]);
-const uiInputSchema = z.union([uiWebSchema, uiMobileSchema, uiStackSchema]);
+const internationalizationInputSchema = z.union([webInternationalizationSchema, mobileInternationalizationSchema, internationalizationStackSchema]);
+const userInterfaceInputSchema = z.union([webUserInterfaceSchema, mobileUserInterfaceSchema, userInterfaceStackSchema]);
 
+/** Validates supported scaffold choices and their cross-platform constraints. */
 export const projectConfigSchema = z
   .object({
     $schema: z.string().optional(),
@@ -55,17 +66,18 @@ export const projectConfigSchema = z
     apps: z.array(appSchema).optional(),
     backend: backendSchema.default("rest"),
     convexExample: z.boolean().default(false),
-    auth: authSchema.default("clerk"),
-    i18n: i18nInputSchema,
-    ui: uiInputSchema,
+    enforceCodeStandards: z.boolean().default(false),
+    auth: authenticationSchema.default("clerk"),
+    i18n: internationalizationInputSchema,
+    ui: userInterfaceInputSchema,
     locales: z.array(z.string().min(2)).min(1).default(["en", "fr"]),
     defaultLocale: z.string().min(2).default("en"),
     runtime: expoRuntimeSchema.optional(),
   })
   .strict()
-  .superRefine((config, ctx) => {
+  .superRefine((config, context) => {
     if (config.convexExample && config.backend !== "convex") {
-      ctx.addIssue({
+      context.addIssue({
         code: "custom",
         message: "convexExample requires the Convex backend",
         path: ["convexExample"],
@@ -79,7 +91,7 @@ export const projectConfigSchema = z
         !config.apps.includes("web") ||
         !config.apps.includes("mobile"))
     ) {
-      ctx.addIssue({
+      context.addIssue({
         code: "custom",
         message: "monorepo currently supports exactly web and mobile",
         path: ["apps"],
@@ -87,7 +99,7 @@ export const projectConfigSchema = z
     }
 
     if (config.topology !== "monorepo" && config.apps !== undefined) {
-      ctx.addIssue({
+      context.addIssue({
         code: "custom",
         message: "apps[] is only valid for monorepo topology",
         path: ["apps"],
@@ -95,7 +107,7 @@ export const projectConfigSchema = z
     }
 
     if (config.defaultLocale && !config.locales.includes(config.defaultLocale)) {
-      ctx.addIssue({
+      context.addIssue({
         code: "custom",
         message: "defaultLocale must be included in locales[]",
         path: ["defaultLocale"],
@@ -105,17 +117,17 @@ export const projectConfigSchema = z
     const hasMobile =
       config.topology === "mobile" || config.topology === "monorepo";
     if (hasMobile && !config.runtime) {
-      ctx.addIssue({
+      context.addIssue({
         code: "custom",
         message: "mobile projects require runtime (expo-go | dev-build)",
         path: ["runtime"],
       });
     }
 
-    const mobileI18n =
+    const mobileInternationalization =
       typeof config.i18n === "object" ? config.i18n.mobile : config.i18n;
-    if (hasMobile && config.runtime === "expo-go" && mobileI18n !== "none") {
-      ctx.addIssue({
+    if (hasMobile && config.runtime === "expo-go" && mobileInternationalization !== "none") {
+      context.addIssue({
         code: "custom",
         message: "Expo Go currently requires mobile i18n to be none",
         path: ["i18n"],
@@ -124,9 +136,9 @@ export const projectConfigSchema = z
     if (
       hasMobile &&
       config.runtime === "dev-build" &&
-      mobileI18n !== "gt-react-native"
+      mobileInternationalization !== "gt-react-native"
     ) {
-      ctx.addIssue({
+      context.addIssue({
         code: "custom",
         message: "Expo development builds currently use gt-react-native",
         path: ["i18n"],
@@ -134,37 +146,52 @@ export const projectConfigSchema = z
     }
   });
 
+/** Validated scaffold choices with defaults applied. */
 export type ProjectConfig = z.infer<typeof projectConfigSchema>;
+/** Package manager selected for scaffolding and dependency installation. */
 export type PackageManager = z.infer<typeof packageManagerSchema>;
+/** Layout of the generated standalone application or monorepo. */
 export type Topology = z.infer<typeof topologySchema>;
+/** Application platform included in the generated project. */
 export type App = z.infer<typeof appSchema>;
+/** Backend integration selected for the application. */
 export type Backend = z.infer<typeof backendSchema>;
-export type Auth = z.infer<typeof authSchema>;
-export type I18nWeb = z.infer<typeof i18nWebSchema>;
-export type I18nMobile = z.infer<typeof i18nMobileSchema>;
-export type UiWeb = z.infer<typeof uiWebSchema>;
-export type UiMobile = z.infer<typeof uiMobileSchema>;
+/** Authentication provider selected for the application. */
+export type Authentication = z.infer<typeof authenticationSchema>;
+/** Translation integration selected for the web application. */
+export type WebInternationalization = z.infer<typeof webInternationalizationSchema>;
+/** Translation integration selected for the mobile application. */
+export type MobileInternationalization = z.infer<typeof mobileInternationalizationSchema>;
+/** User interface integration selected for the web application. */
+export type WebUserInterface = z.infer<typeof webUserInterfaceSchema>;
+/** User interface integration selected for the mobile application. */
+export type MobileUserInterface = z.infer<typeof mobileUserInterfaceSchema>;
+/** Expo runtime used to execute the mobile application. */
 export type ExpoRuntime = z.infer<typeof expoRuntimeSchema>;
 
-export type NormalizedI18n = {
-  web?: I18nWeb;
-  mobile?: I18nMobile;
+/** Translation settings resolved separately for each selected application. */
+export type NormalizedInternationalization = {
+  web?: WebInternationalization;
+  mobile?: MobileInternationalization;
 };
 
-export type NormalizedUi = {
-  web?: UiWeb;
-  mobile?: UiMobile;
+/** User interface settings resolved separately for each selected application. */
+export type NormalizedUserInterface = {
+  web?: WebUserInterface;
+  mobile?: MobileUserInterface;
 };
 
+/** Application platforms enabled by the selected project layout. */
 export type ProjectStacks = {
   hasWeb: boolean;
   hasMobile: boolean;
 };
 
+/** Scaffold choices resolved into application-specific integration settings. */
 export type NormalizedProjectConfig = Omit<ProjectConfig, "apps" | "i18n" | "ui"> & {
   apps: App[];
-  i18n: NormalizedI18n;
-  ui: NormalizedUi;
+  i18n: NormalizedInternationalization;
+  ui: NormalizedUserInterface;
   stacks: ProjectStacks;
 };
 
@@ -178,12 +205,12 @@ function resolveApps(config: ProjectConfig): App[] {
   return ["web", "mobile"];
 }
 
-function normalizeI18n(config: ProjectConfig, apps: App[]): NormalizedI18n {
+function normalizeInternationalization(config: ProjectConfig, apps: App[]): NormalizedInternationalization {
   if (typeof config.i18n === "string") {
     if (config.topology === "web") {
-      return { web: config.i18n as I18nWeb };
+      return { web: config.i18n as WebInternationalization };
     }
-    return { mobile: config.i18n as I18nMobile };
+    return { mobile: config.i18n as MobileInternationalization };
   }
 
   return {
@@ -192,12 +219,12 @@ function normalizeI18n(config: ProjectConfig, apps: App[]): NormalizedI18n {
   };
 }
 
-function normalizeUi(config: ProjectConfig, apps: App[]): NormalizedUi {
+function normalizeUserInterface(config: ProjectConfig, apps: App[]): NormalizedUserInterface {
   if (typeof config.ui === "string") {
     if (config.topology === "web") {
-      return { web: config.ui as UiWeb };
+      return { web: config.ui as WebUserInterface };
     }
-    return { mobile: config.ui as UiMobile };
+    return { mobile: config.ui as MobileUserInterface };
   }
 
   return {
@@ -206,17 +233,17 @@ function normalizeUi(config: ProjectConfig, apps: App[]): NormalizedUi {
   };
 }
 
-/** Resolve topology-specific apps and integration selections into one configuration. */
+/** Resolves shared scaffold settings into the selected application stacks. */
 export function normalizeProjectConfig(config: ProjectConfig): NormalizedProjectConfig {
   const apps = resolveApps(config);
-  const i18n = normalizeI18n(config, apps);
-  const ui = normalizeUi(config, apps);
+  const internationalization = normalizeInternationalization(config, apps);
+  const userInterface = normalizeUserInterface(config, apps);
 
   return {
     ...config,
     apps,
-    i18n,
-    ui,
+    i18n: internationalization,
+    ui: userInterface,
     stacks: {
       hasWeb: apps.includes("web"),
       hasMobile: apps.includes("mobile"),
@@ -224,12 +251,12 @@ export function normalizeProjectConfig(config: ProjectConfig): NormalizedProject
   };
 }
 
-/** Validate project input and return its normalized configuration. */
+/** Validates scaffold input and resolves platform-specific defaults. */
 export function parseProjectConfig(input: unknown): NormalizedProjectConfig {
   return normalizeProjectConfig(projectConfigSchema.parse(input));
 }
 
-/** Describe accepted project inputs as a portable JSON Schema. */
+/** Describes accepted scaffold input for JSON-aware editors and tooling. */
 export function projectConfigJsonSchema(): Record<string, unknown> {
   return toJSONSchema(projectConfigSchema, {
     target: "draft-2020-12",
@@ -238,9 +265,9 @@ export function projectConfigJsonSchema(): Record<string, unknown> {
   }) as Record<string, unknown>;
 }
 
-/** Load and validate a project configuration from a JSON file. */
+/** Loads and validates scaffold choices from a JSON input file. */
 export function loadProjectConfigFromFile(configPath: string): NormalizedProjectConfig {
   const absolutePath = path.resolve(configPath);
-  const raw = readFileSync(absolutePath, "utf-8");
-  return parseProjectConfig(JSON.parse(raw) as unknown);
+  const contents = readFileSync(absolutePath, "utf-8");
+  return parseProjectConfig(JSON.parse(contents) as unknown);
 }

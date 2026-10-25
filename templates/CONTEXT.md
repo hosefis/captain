@@ -12,6 +12,7 @@ Project stack, layout, and development commands for developers and coding agents
 | Package manager | `{packageManager}` |
 | Backend | `{backend}` |
 | Convex example | {convexExample} |
+| Code standards | {codeStandards} |
 | Auth | `{auth}` |
 | Web i18n | `{i18nWeb}` |
 | Mobile i18n | `{i18nMobile}` |
@@ -29,10 +30,11 @@ Project stack, layout, and development commands for developers and coding agents
 ## Commands
 
 Use `{packageManager}` to install dependencies and run the generated
-`typecheck`, `lint`, `build`, and `dev` scripts.
+`typecheck`, `lint`, and `build` scripts, plus the application's `dev` or `start`
+script.
 
 ## Agent notes
 
 - Dependency versions and scripts are defined in each `package.json`.
-- Import modules by their file or package subpath; avoid barrel files.
+- See `AGENTS.md` for coding standards and `CLAUDE.md` for the shared guidance import.
 {backendNotes}

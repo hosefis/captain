@@ -1,5 +1,7 @@
+/** HTTP methods supported by the backend client. */
 export type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
+/** Request payload, headers, and authentication overrides for a backend call. */
 export type HttpRequestOptions = {
   method?: HttpMethod;
   headers?: Record<string, string>;
@@ -7,10 +9,11 @@ export type HttpRequestOptions = {
   token?: string;
 };
 
+/** Typed request interface for application backend access. */
 export type BackendClient = {
-  /** Send a backend request and decode its response. */
+  /** Sends a backend request and decodes its JSON response. */
   request<T>(path: string, options?: HttpRequestOptions): Promise<T>;
 };
 
-/** Create a backend client for the current application context. */
+/** Creates a backend client for the current application context. */
 export type BackendClientFactory = () => BackendClient;

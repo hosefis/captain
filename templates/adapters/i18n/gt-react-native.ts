@@ -8,4 +8,5 @@ export const gtReactNativeConfig = {
   projectId: process.env.EXPO_PUBLIC_GT_PROJECT_ID ?? "",
 } as const;
 
+/** Locale accepted by the configured mobile translation adapter. */
 export type GtReactNativeLocale = (typeof gtReactNativeConfig.locales)[number];

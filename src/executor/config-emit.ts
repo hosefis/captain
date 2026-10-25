@@ -3,12 +3,13 @@ import { join } from "node:path";
 import { writeRenderedFile } from "../generators/template.js";
 import { templatesDirectory } from "../lib/paths.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import { emitAgentGuidance } from "./agent-guidance.js";
 
-function templateVars(config: NormalizedProjectConfig): Record<string, string> {
-  const i18nWeb = config.i18n.web ?? "—";
-  const i18nMobile = config.i18n.mobile ?? "—";
-  const uiWeb = config.ui.web ?? "—";
-  const uiMobile = config.ui.mobile ?? "—";
+function templateVariables(config: NormalizedProjectConfig): Record<string, string> {
+  const webInternationalization = config.i18n.web ?? "—";
+  const mobileInternationalization = config.i18n.mobile ?? "—";
+  const webUserInterface = config.ui.web ?? "—";
+  const mobileUserInterface = config.ui.mobile ?? "—";
 
   return {
     name: config.name,
@@ -18,15 +19,16 @@ function templateVars(config: NormalizedProjectConfig): Record<string, string> {
     backend: config.backend,
     backendNotes: config.backend === "convex" ? "- Convex setup: see `CONVEX.md`." : "",
     auth: config.auth,
-    i18nWeb,
-    i18nMobile,
-    uiWeb,
-    uiMobile,
+    i18nWeb: webInternationalization,
+    i18nMobile: mobileInternationalization,
+    uiWeb: webUserInterface,
+    uiMobile: mobileUserInterface,
     locales: config.locales.join(", "),
     defaultLocale: config.defaultLocale,
     apps: config.apps.join(", "),
     runtime: config.runtime ?? "n/a",
     convexExample: config.convexExample ? "enabled" : "disabled",
+    codeStandards: config.enforceCodeStandards ? "enabled" : "guidance only",
     backendEnvironment:
       config.backend === "convex"
         ? [
@@ -52,21 +54,21 @@ function templateVars(config: NormalizedProjectConfig): Record<string, string> {
   };
 }
 
-/** Write onboarding guidance for the selected project stack. */
-export function emitContextMd(config: NormalizedProjectConfig, targetDir: string): void {
+/** Writes onboarding notes describing the selected project stack. */
+export function emitProjectContext(config: NormalizedProjectConfig, targetDirectory: string): void {
   writeRenderedFile(
     join(templatesDirectory(), "CONTEXT.md"),
-    join(targetDir, "CONTEXT.md"),
-    templateVars(config),
+    join(targetDirectory, "CONTEXT.md"),
+    templateVariables(config),
   );
 }
 
-/** Write environment variable examples for the selected integrations. */
-export function emitEnvExample(config: NormalizedProjectConfig, targetDir: string): void {
+/** Writes environment placeholders for the selected integrations and applications. */
+export function emitEnvironmentExample(config: NormalizedProjectConfig, targetDirectory: string): void {
   writeRenderedFile(
     join(templatesDirectory(), "env.example"),
-    join(targetDir, ".env.example"),
-    templateVars(config),
+    join(targetDirectory, ".env.example"),
+    templateVariables(config),
   );
   if (config.topology === "monorepo" && config.backend === "convex") {
     const webVariables = [
@@ -79,13 +81,14 @@ export function emitEnvExample(config: NormalizedProjectConfig, targetDir: strin
       "EXPO_PUBLIC_CONVEX_URL=",
       ...(config.auth === "clerk" ? ["EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY="] : []),
     ];
-    writeFileSync(join(targetDir, "apps", "web", ".env.example"), `${webVariables.join("\n")}\n`);
-    writeFileSync(join(targetDir, "apps", "mobile", ".env.example"), `${mobileVariables.join("\n")}\n`);
+    writeFileSync(join(targetDirectory, "apps", "web", ".env.example"), `${webVariables.join("\n")}\n`);
+    writeFileSync(join(targetDirectory, "apps", "mobile", ".env.example"), `${mobileVariables.join("\n")}\n`);
   }
 }
 
 /** Writes project onboarding documentation and environment variable examples. */
-export function applyConfigEmit(config: NormalizedProjectConfig, targetDir: string): void {
-  emitContextMd(config, targetDir);
-  emitEnvExample(config, targetDir);
+export function applyConfigEmit(config: NormalizedProjectConfig, targetDirectory: string): void {
+  emitAgentGuidance(targetDirectory);
+  emitProjectContext(config, targetDirectory);
+  emitEnvironmentExample(config, targetDirectory);
 }

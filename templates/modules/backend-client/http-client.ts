@@ -1,15 +1,16 @@
 import type { BackendClient, HttpRequestOptions } from "./client.js";
 
+/** Backend base URL and optional asynchronous token provider. */
 export type HttpClientConfig = {
   baseUrl: string;
-  /** Retrieve the current session token for authenticated requests. */
+  /** Resolves the authentication token for a request when no override is supplied. */
   getToken?: () => Promise<string | null>;
 };
 
-/** Create a JSON HTTP client with optional session authentication. */
+/** Creates an authenticated JSON client for the configured backend URL. */
 export function createHttpClient(config: HttpClientConfig): BackendClient {
   return {
-    /** Send an authenticated JSON request and reject unsuccessful responses. */
+    /** Sends an authenticated JSON request and rejects unsuccessful responses. */
     async request<T>(path: string, options: HttpRequestOptions = {}): Promise<T> {
       const headers: Record<string, string> = {
         "Content-Type": "application/json",

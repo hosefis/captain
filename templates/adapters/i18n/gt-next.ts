@@ -8,4 +8,5 @@ export const gtNextConfig = {
   projectId: process.env.GT_PROJECT_ID ?? "",
 } as const;
 
+/** Locale accepted by the configured web translation adapter. */
 export type GtNextLocale = (typeof gtNextConfig.locales)[number];

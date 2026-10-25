@@ -1,4 +1,4 @@
-/** Configure Expo and NativeWind Babel transforms. */
+/** Configures Expo transpilation and NativeWind JSX support. */
 module.exports = function (api) {
   api.cache(true);
   return {

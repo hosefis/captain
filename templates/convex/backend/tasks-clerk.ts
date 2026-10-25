@@ -1,29 +1,31 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server.js";
 
+/** Lists tasks visible to the current application user. */
 export const list = query({
   args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
+  handler: async (context) => {
+    const identity = await context.auth.getUserIdentity();
     if (!identity) throw new Error("Sign in to view your tasks.");
-    return ctx.db
+    return context.db
       .query("tasks")
-      .withIndex("by_owner", (q) => q.eq("ownerId", identity.subject))
+      .withIndex("by_owner", (queryBuilder) => queryBuilder.eq("ownerId", identity.subject))
       .order("desc")
       .collect();
   },
 });
 
+/** Creates a task after validating its text and the current user. */
 export const add = mutation({
   args: { text: v.string() },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+  handler: async (context, taskInput) => {
+    const identity = await context.auth.getUserIdentity();
     if (!identity) throw new Error("Sign in to add a task.");
-    const text = args.text.trim();
+    const text = taskInput.text.trim();
     if (!text || text.length > 200) {
       throw new Error("Task text must be between 1 and 200 characters.");
     }
-    return ctx.db.insert("tasks", {
+    return context.db.insert("tasks", {
       text,
       completed: false,
       ownerId: identity.subject,
@@ -31,15 +33,16 @@ export const add = mutation({
   },
 });
 
+/** Changes completion state after checking that the task is accessible. */
 export const setCompleted = mutation({
   args: { id: v.id("tasks"), completed: v.boolean() },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
+  handler: async (context, taskInput) => {
+    const identity = await context.auth.getUserIdentity();
     if (!identity) throw new Error("Sign in to update a task.");
-    const task = await ctx.db.get(args.id);
+    const task = await context.db.get(taskInput.id);
     if (!task || task.ownerId !== identity.subject) {
       throw new Error("Task not found.");
     }
-    await ctx.db.patch(args.id, { completed: args.completed });
+    await context.db.patch(taskInput.id, { completed: taskInput.completed });
   },
 });

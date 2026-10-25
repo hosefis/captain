@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type ts from "typescript";
 import { resolveBootstrapPlan } from "../resolver/bootstrap.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 import { applyConfigEmit } from "./config-emit.js";
@@ -11,7 +12,10 @@ import {
 } from "./bootstrap-run.js";
 import { applyProjectStructure } from "./project-structure.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
+import { documentStarterSource, findStarterSourceFiles } from "./starter-documentation.js";
+import { applyExpoStarterLintCompatibility } from "./expo-lint-compatibility.js";
 
+/** Outcome of framework scaffolding, integration generation, and dependency installation. */
 export type BootstrapPhaseResult =
   | {
       ok: true;
@@ -25,17 +29,20 @@ export type BootstrapPhaseResult =
       bootstrap?: BootstrapRunResult;
     };
 
+/** Progress reporting and execution overrides used during scaffold bootstrap. */
 export type RunBootstrapPhaseOptions = {
-  /** Report project creation progress to the caller. */
+  /** Reports the start and completion of a scaffold step. */
   onProgress?: (event: {
     status: "start" | "complete";
     id: string;
     description: string;
   }) => void;
-  /** Replace process execution while preserving scaffold sequencing. */
+  /** Executes scaffold commands with an optional caller-supplied runner. */
   bootstrapRunner?: BootstrapRunner;
   /** Simulate create-next-app output when using a mock runner (standalone topologies). */
   simulateBootstrapOutput?: boolean;
+  /** Supplies an explicit compiler for simulated starters without dependency installation. */
+  starterCompiler?: typeof ts;
 };
 
 function appBootstrapScripts(kind: "web" | "mobile"): Record<string, string> {
@@ -118,7 +125,7 @@ function simulateBootstrapOutput(
   simulateMonorepoBootstrap(targetDirectory, config);
 }
 
-/** Scaffold framework apps, apply recipes, and install project dependencies. */
+/** Scaffolds frameworks, applies project integrations, and installs dependencies. */
 export async function runBootstrapPhase(
   config: NormalizedProjectConfig,
   targetDirectory: string,
@@ -156,6 +163,7 @@ export async function runBootstrapPhase(
   if (options.simulateBootstrapOutput) {
     simulateBootstrapOutput(config, targetDirectory);
   }
+  const starterSourceFiles = findStarterSourceFiles(targetDirectory);
 
   try {
     options.onProgress?.({
@@ -256,6 +264,27 @@ export async function runBootstrapPhase(
     };
   }
 
+  try {
+    options.onProgress?.({ status: "start", id: "starter-documentation", description: "Document recognized editable framework starter exports" });
+    documentStarterSource(targetDirectory, options.starterCompiler, starterSourceFiles);
+    options.onProgress?.({ status: "complete", id: "starter-documentation", description: "Prepared editable framework starter documentation" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Starter documentation failed";
+    return { ok: false, phase: "recipes", message: `Starter documentation failed: ${message}` };
+  }
+
+  if (config.stacks.hasMobile) {
+    try {
+      options.onProgress?.({ status: "start", id: "expo-starter-lint", description: "Preserve Expo starter lint compatibility" });
+      const mobileDirectory = config.topology === "monorepo" ? join(targetDirectory, "apps/mobile") : targetDirectory;
+      applyExpoStarterLintCompatibility(mobileDirectory, options.starterCompiler);
+      options.onProgress?.({ status: "complete", id: "expo-starter-lint", description: "Preserved Expo starter lint compatibility" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Expo starter lint compatibility failed";
+      return { ok: false, phase: "recipes", message: `Expo starter lint compatibility failed: ${message}` };
+    }
+  }
+
   return {
     ok: true,
     completedBootstrapSteps: [
@@ -266,7 +295,10 @@ export async function runBootstrapPhase(
       "project-structure",
       "context-md",
       "env-example",
+      "agent-guidance",
       ...recipesResult.appliedRecipes,
+      "starter-documentation",
+      ...(config.stacks.hasMobile ? ["expo-starter-lint"] : []),
     ],
   };
 }

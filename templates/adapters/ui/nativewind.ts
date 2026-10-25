@@ -7,6 +7,7 @@ export const nativeWindConfig = {
   presets: ["nativewind/preset"],
 } as const;
 
+/** Tailwind layers used by the NativeWind application stylesheet. */
 export const nativeWindGlobalCss = `@tailwind base;
 @tailwind components;
 @tailwind utilities;

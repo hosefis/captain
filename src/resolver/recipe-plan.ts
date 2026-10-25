@@ -1,12 +1,13 @@
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
+/** Planned generation step and its execution phase. */
 export type RecipeStep = {
   id: string;
   phase: "workspace" | "module" | "adapter" | "config" | "install";
   description: string;
 };
 
-/** Plan workspace setup and integration recipes for the selected stack. */
+/** Orders generation steps for the selected project integrations and guidance. */
 export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[] {
   const steps: RecipeStep[] = [
     {
@@ -21,6 +22,11 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
       id: "context-md",
       phase: "config",
       description: "Write CONTEXT.md for developer and agent onboarding",
+    },
+    {
+      id: "agent-guidance",
+      phase: "config",
+      description: "Preserve framework guidance and synchronize AGENTS.md and CLAUDE.md",
     },
     {
       id: "env-example",
@@ -100,10 +106,30 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     });
   }
 
+  if (config.enforceCodeStandards) {
+    steps.push({
+      id: "code-standards",
+      phase: "config",
+      description: "Copy standalone standards checker and extend framework and workspace lint commands",
+    });
+  }
+  steps.push({
+    id: "starter-documentation",
+    phase: "install",
+    description: "Document recognized editable starter exports after dependency installation",
+  });
+  if (config.stacks.hasMobile) {
+    steps.push({
+      id: "expo-starter-lint",
+      phase: "install",
+      description: "Preserve framework ESLint configuration and Expo starter hydration compatibility",
+    });
+  }
+
   return steps;
 }
 
-/** Choose validation steps for human or agent project creation. */
+/** Selects validation commands for interactive or agent-driven scaffolding. */
 export function resolveSmokePlan(_config: NormalizedProjectConfig, agentMode: boolean): string[] {
   const steps = ["typecheck", "lint"];
   if (agentMode) {

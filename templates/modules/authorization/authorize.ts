@@ -1,15 +1,15 @@
 import type {
-  AuthDecision,
+  AuthorizationDecision,
   AuthorizationAction,
   AuthorizationAdapter,
   AuthorizationClaims,
 } from "./types.js";
 
-/** Evaluate an action against the selected authorization policy. */
+/** Delegates a resource action to the configured authorization policy. */
 export function authorize(
   adapter: AuthorizationAdapter,
   action: AuthorizationAction,
   claims: AuthorizationClaims,
-): AuthDecision {
+): AuthorizationDecision {
   return adapter.authorize(action, claims);
 }

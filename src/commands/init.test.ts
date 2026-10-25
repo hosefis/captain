@@ -304,6 +304,7 @@ describe("buildInitPlan", () => {
         apps: ["web"],
         backend: "rest",
         convexExample: false,
+        enforceCodeStandards: false,
         auth: "clerk",
         i18n: { web: "gt-next" },
         ui: { web: "shadcn-base-ui" },

@@ -2,7 +2,7 @@ import { Stack } from "expo-router";
 import { ConvexProvider } from "@/integrations/convex/convex-provider";
 import "../global.css";
 
-/** Provide the application stack around routed content. */
+/** Wraps application routes with the selected providers and root layout. */
 export default function RootLayout() {
   return <ConvexProvider><Stack /></ConvexProvider>;
 }
