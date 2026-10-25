@@ -1,5 +1,5 @@
-export type SupportedOption<T extends string> = {
-  value: T;
+export type SupportedOption<Value extends string> = {
+  value: Value;
   label: string;
 };
 
@@ -26,25 +26,27 @@ export const SUPPORTED_OPTIONS = {
     { value: "clerk", label: "Clerk" },
     { value: "none", label: "No authentication" },
   ],
-  webI18n: [{ value: "gt-next", label: "General Translation" }],
-  mobileI18n: [
+  webInternationalization: [{ value: "gt-next", label: "General Translation" }],
+  mobileInternationalization: [
     { value: "gt-react-native", label: "General Translation" },
     { value: "none", label: "No internationalization" },
   ],
-  webUi: [{ value: "shadcn-base-ui", label: "shadcn + Base UI" }],
-  mobileUi: [{ value: "nativewind", label: "NativeWind" }],
+  webUserInterface: [{ value: "shadcn-base-ui", label: "shadcn + Base UI" }],
+  mobileUserInterface: [{ value: "nativewind", label: "NativeWind" }],
 } as const;
 
+/** Extract schema-ready values while retaining each option's literal type. */
 export function optionValues<
-  const T extends readonly SupportedOption<string>[],
->(options: T): { [K in keyof T]: T[K] extends SupportedOption<infer V> ? V : never } {
+  const Options extends readonly SupportedOption<string>[],
+>(options: Options): { [Index in keyof Options]: Options[Index] extends SupportedOption<infer Value> ? Value : never } {
   return options.map((option) => option.value) as {
-    [K in keyof T]: T[K] extends SupportedOption<infer V> ? V : never;
+    [Index in keyof Options]: Options[Index] extends SupportedOption<infer Value> ? Value : never;
   };
 }
 
-export function compatibleMobileI18n(runtime: "expo-go" | "dev-build") {
-  return SUPPORTED_OPTIONS.mobileI18n.filter((option) =>
+/** List mobile translation options supported by the selected Expo runtime. */
+export function compatibleMobileInternationalization(runtime: "expo-go" | "dev-build") {
+  return SUPPORTED_OPTIONS.mobileInternationalization.filter((option) =>
     runtime === "expo-go"
       ? option.value === "none"
       : option.value === "gt-react-native",

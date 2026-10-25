@@ -1,177 +1,179 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeRenderedFile } from "../generators/template.js";
-import { templatesDir } from "../lib/paths.js";
+import { templatesDirectory } from "../lib/paths.js";
 import { resolveRecipePlan, type RecipeStep } from "../resolver/recipe-plan.js";
-import type { App, NormalizedProjectConfig } from "../schema/project-config.js";
+import type { App, NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 import { mergePackageJson } from "./package-json.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
-import { buildRecipeVars, type RecipeVars } from "./recipe-vars.js";
+import { buildRecipeVariables, type RecipeVariables } from "./recipe-variables.js";
 import { testedRange } from "./tested-versions.js";
+import { applyCodeStandards } from "./code-standards.js";
 
+/** Outcome of applying integration recipes, including the failed step when applicable. */
 export type ApplyRecipesResult =
   | { ok: true; appliedRecipes: string[] }
   | { ok: false; stepId: string; message: string };
 
-function coreSourceDir(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+function coreSourceDirectory(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
 ): string {
-  return config.topology === "monorepo"
-    ? join(targetDir, "packages", "core", "src")
-    : join(targetDir, "src", "lib");
+  return configuration.topology === "monorepo"
+    ? join(targetDirectory, "packages", "core", "src")
+    : join(targetDirectory, "src", "lib");
 }
 
-function adapterSourceDir(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  adapterId: "adapters-next" | "adapters-expo",
+function adapterSourceDirectory(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  adapterName: "adapters-next" | "adapters-expo",
 ): string {
-  return config.topology === "monorepo"
-    ? join(targetDir, "packages", adapterId, "src")
-    : join(targetDir, "src", "integrations");
+  return configuration.topology === "monorepo"
+    ? join(targetDirectory, "packages", adapterName, "src")
+    : join(targetDirectory, "src", "integrations");
 }
 
-function appDir(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+function appDirectory(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
   app: "web" | "mobile",
 ): string {
-  return config.topology === "monorepo"
-    ? join(targetDir, "apps", app)
-    : targetDir;
+  return configuration.topology === "monorepo"
+    ? join(targetDirectory, "apps", app)
+    : targetDirectory;
 }
 
-function appSourceDir(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+function appSourceDirectory(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
   app: "web" | "mobile",
 ): string {
-  return join(appDir(targetDir, config, app), "src");
+  return join(appDirectory(targetDirectory, configuration, app), "src");
 }
 
-function integrationPackageJson(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  adapterId: "adapters-next" | "adapters-expo",
+function integrationPackagePath(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  adapterName: "adapters-next" | "adapters-expo",
 ): string {
-  return config.topology === "monorepo"
-    ? join(targetDir, "packages", adapterId, "package.json")
-    : join(targetDir, "package.json");
+  return configuration.topology === "monorepo"
+    ? join(targetDirectory, "packages", adapterName, "package.json")
+    : join(targetDirectory, "package.json");
 }
 
-function mergeAppPackageJson(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+function mergeApplicationManifest(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
   app: "web" | "mobile",
   patch: Parameters<typeof mergePackageJson>[1],
 ): void {
-  const pkgPath = join(appDir(targetDir, config, app), "package.json");
-  if (!existsSync(pkgPath)) {
+  const packagePath = join(appDirectory(targetDirectory, configuration, app), "package.json");
+  if (!existsSync(packagePath)) {
     return;
   }
-  mergePackageJson(pkgPath, patch);
+  mergePackageJson(packagePath, patch);
 }
 
 function renderModuleFile(
   templateRelativePath: string,
   targetPath: string,
-  vars: RecipeVars,
+  variables: RecipeVariables,
 ): void {
-  writeRenderedFile(join(templatesDir(), templateRelativePath), targetPath, vars);
+  writeRenderedFile(join(templatesDirectory(), templateRelativePath), targetPath, variables);
 }
 
 function applyBackendRest(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
   onlyApp?: App,
 ): void {
-  const core = coreSourceDir(targetDir, config);
+  const coreDirectory = coreSourceDirectory(targetDirectory, configuration);
   if (!onlyApp) {
-    mkdirSync(join(core, "backend"), { recursive: true });
-    renderModuleFile("modules/backend-client/client.ts", join(core, "backend", "client.ts"), vars);
+    mkdirSync(join(coreDirectory, "backend"), { recursive: true });
+    renderModuleFile("modules/backend-client/client.ts", join(coreDirectory, "backend", "client.ts"), variables);
     renderModuleFile(
       "modules/backend-client/http-client.ts",
-      join(core, "backend", "http-client.ts"),
-      vars,
+      join(coreDirectory, "backend", "http-client.ts"),
+      variables,
     );
   }
 
-  if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
-    const integrations = adapterSourceDir(targetDir, config, "adapters-next");
-    mkdirSync(join(integrations, "backend"), { recursive: true });
+  if (configuration.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
+    const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-next");
+    mkdirSync(join(integrationsDirectory, "backend"), { recursive: true });
     renderModuleFile(
       "adapters/backend/rest-next.ts",
-      join(integrations, "backend", "rest.ts"),
-      vars,
+      join(integrationsDirectory, "backend", "rest.ts"),
+      variables,
     );
   }
 
-  if (config.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
-    const integrations = adapterSourceDir(targetDir, config, "adapters-expo");
-    mkdirSync(join(integrations, "backend"), { recursive: true });
+  if (configuration.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
+    const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-expo");
+    mkdirSync(join(integrationsDirectory, "backend"), { recursive: true });
     renderModuleFile(
       "adapters/backend/rest-expo.ts",
-      join(integrations, "backend", "rest.ts"),
-      vars,
+      join(integrationsDirectory, "backend", "rest.ts"),
+      variables,
     );
   }
 }
 
 function applyBackendConvex(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
 ): void {
-  const monorepo = config.topology === "monorepo";
-  const functionsDir = monorepo
-    ? join(targetDir, "packages", "convex", "convex")
-    : join(targetDir, "convex");
-  const backendVars = { ...vars, convexApiImport: "./_generated/api" };
-  const backendTemplate = (source: string, target: string): void =>
-    renderModuleFile(`convex/backend/${source}`, join(functionsDir, target), backendVars);
-  renderModuleFile("convex/SETUP.md", join(targetDir, "CONVEX.md"), vars);
-  mkdirSync(join(functionsDir, "_generated"), { recursive: true });
-  backendTemplate(
-    config.convexExample
-      ? config.auth === "clerk" ? "schema-clerk.ts" : "schema.ts"
+  const monorepo = configuration.topology === "monorepo";
+  const functionsDirectory = monorepo
+    ? join(targetDirectory, "packages", "convex", "convex")
+    : join(targetDirectory, "convex");
+  const backendVariables = { ...variables, convexApiImport: "./_generated/api" };
+  const renderBackendTemplate = (source: string, target: string): void =>
+    renderModuleFile(`convex/backend/${source}`, join(functionsDirectory, target), backendVariables);
+  renderModuleFile("convex/SETUP.md", join(targetDirectory, "CONVEX.md"), variables);
+  mkdirSync(join(functionsDirectory, "_generated"), { recursive: true });
+  renderBackendTemplate(
+    configuration.convexExample
+      ? configuration.auth === "clerk" ? "schema-clerk.ts" : "schema.ts"
       : "schema-empty.ts",
     "schema.ts",
   );
-  if (config.auth === "clerk") {
-    backendTemplate("auth.config.ts", "auth.config.ts");
+  if (configuration.auth === "clerk") {
+    renderBackendTemplate("auth.config.ts", "auth.config.ts");
   }
-  if (config.convexExample) {
-    backendTemplate(config.auth === "clerk" ? "tasks-clerk.ts" : "tasks-public.ts", "tasks.ts");
+  if (configuration.convexExample) {
+    renderBackendTemplate(configuration.auth === "clerk" ? "tasks-clerk.ts" : "tasks-public.ts", "tasks.ts");
   }
   for (const file of ["api.js", "server.js", "server.d.ts"]) {
-    backendTemplate(`_generated/${file}`, `_generated/${file}`);
+    renderBackendTemplate(`_generated/${file}`, `_generated/${file}`);
   }
-  backendTemplate(
-    `_generated/${config.convexExample ? "api-tasks.d.ts" : "api-empty.d.ts"}`,
+  renderBackendTemplate(
+    `_generated/${configuration.convexExample ? "api-tasks.d.ts" : "api-empty.d.ts"}`,
     "_generated/api.d.ts",
   );
-  backendTemplate(
-    `_generated/${config.convexExample ? "dataModel-tasks.d.ts" : "dataModel-empty.d.ts"}`,
+  renderBackendTemplate(
+    `_generated/${configuration.convexExample ? "dataModel-tasks.d.ts" : "dataModel-empty.d.ts"}`,
     "_generated/dataModel.d.ts",
   );
 
   const convexVersion = testedRange("convex");
-  mergePackageJson(join(targetDir, "package.json"), {
+  mergePackageJson(join(targetDirectory, "package.json"), {
     ...(monorepo ? { devDependencies: { convex: convexVersion } } : { dependencies: { convex: convexVersion } }),
     scripts: { "convex:dev": "convex dev", "convex:deploy": "convex deploy" },
   });
 
   if (monorepo) {
     writeFileSync(
-      join(targetDir, "convex.json"),
+      join(targetDirectory, "convex.json"),
       `${JSON.stringify({ functions: "packages/convex/convex/" }, null, 2)}\n`,
     );
     writeFileSync(
-      join(targetDir, "packages", "convex", "package.json"),
+      join(targetDirectory, "packages", "convex", "package.json"),
       `${JSON.stringify({
-        name: `${config.scope}/convex`,
+        name: `${configuration.scope}/convex`,
         version: "0.0.0",
         private: true,
         type: "module",
@@ -187,7 +189,7 @@ function applyBackendConvex(
       }, null, 2)}\n`,
     );
     writeFileSync(
-      join(targetDir, "packages", "convex", "tsconfig.json"),
+      join(targetDirectory, "packages", "convex", "tsconfig.json"),
       `${JSON.stringify({ compilerOptions: {
         target: "ES2022", module: "ESNext", moduleResolution: "bundler",
         strict: true, skipLibCheck: true, noEmit: true, isolatedModules: true,
@@ -195,140 +197,144 @@ function applyBackendConvex(
     );
   }
 
-  for (const app of config.apps) {
-    const sourceDir = appSourceDir(targetDir, config, app);
-    const appVars = {
-      ...vars,
+  for (const app of configuration.apps) {
+    const sourceDirectory = appSourceDirectory(targetDirectory, configuration, app);
+    const appVariables = {
+      ...variables,
       convexApiImport: monorepo
-        ? `${config.scope}/convex/_generated/api`
+        ? `${configuration.scope}/convex/_generated/api`
         : app === "web"
           ? "../../../convex/_generated/api"
           : "../../convex/_generated/api",
     };
     const renderApp = (source: string, target: string): void =>
-      renderModuleFile(`convex/${app === "web" ? "web" : "mobile"}/${source}`, join(sourceDir, target), appVars);
-    const authVariant = config.auth === "clerk" ? "clerk" : "none";
-    renderApp(`provider-${authVariant}.tsx`, "integrations/convex/convex-provider.tsx");
+      renderModuleFile(`convex/${app === "web" ? "web" : "mobile"}/${source}`, join(sourceDirectory, target), appVariables);
+    const authenticationVariant = configuration.auth === "clerk" ? "clerk" : "none";
+    renderApp(`provider-${authenticationVariant}.tsx`, "integrations/convex/convex-provider.tsx");
     renderApp("layout.tsx", app === "web" ? "app/layout.tsx" : "app/_layout.tsx");
     if (app === "web") {
-      renderApp(`server-${authVariant}.ts`, "integrations/convex/server.ts");
+      renderApp(`server-${authenticationVariant}.ts`, "integrations/convex/server.ts");
     }
-    if (config.convexExample) {
-      renderApp(`example-page-${authVariant}.tsx`, app === "web" ? "app/example/page.tsx" : "app/example.tsx");
+    if (configuration.convexExample) {
+      renderApp(`example-page-${authenticationVariant}.tsx`, app === "web" ? "app/example/page.tsx" : "app/example.tsx");
       renderApp("home.tsx", app === "web" ? "app/page.tsx" : "app/index.tsx");
-      if (app === "mobile" && config.auth === "clerk") {
+      if (app === "mobile" && configuration.auth === "clerk") {
         renderApp("sign-in.tsx", "app/sign-in.tsx");
       }
     }
     const appDependencies: Record<string, string> = { convex: convexVersion };
     if (monorepo) {
-      appDependencies[`${config.scope}/convex`] =
-        resolvePackageManagerDriver(config.packageManager).workspaceRange;
+      appDependencies[`${configuration.scope}/convex`] =
+        resolvePackageManagerDriver(configuration.packageManager).workspaceRange;
     }
-    mergeAppPackageJson(targetDir, config, app, { dependencies: appDependencies });
+    mergeApplicationManifest(targetDirectory, configuration, app, { dependencies: appDependencies });
   }
 }
 
 function applyModuleAuthorization(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
 ): void {
-  const authDir =
-    config.topology === "monorepo"
-      ? join(coreSourceDir(targetDir, config), "authorization")
-      : join(targetDir, "src", "features", "authorization");
-  mkdirSync(authDir, { recursive: true });
+  const authorizationDirectory =
+    configuration.topology === "monorepo"
+      ? join(coreSourceDirectory(targetDirectory, configuration), "authorization")
+      : join(targetDirectory, "src", "features", "authorization");
+  mkdirSync(authorizationDirectory, { recursive: true });
 
-  renderModuleFile("modules/authorization/types.ts", join(authDir, "types.ts"), vars);
-  renderModuleFile("modules/authorization/authorize.ts", join(authDir, "authorize.ts"), vars);
-  renderModuleFile("modules/authorization/in-memory.ts", join(authDir, "in-memory.ts"), vars);
+  renderModuleFile("modules/authorization/types.ts", join(authorizationDirectory, "types.ts"), variables);
+  renderModuleFile("modules/authorization/authorize.ts", join(authorizationDirectory, "authorize.ts"), variables);
+  renderModuleFile("modules/authorization/in-memory.ts", join(authorizationDirectory, "in-memory.ts"), variables);
 }
 
-function applyAuthClerk(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+function configureExpoAuthenticationPlugins(applicationDirectory: string): void {
+  const configurationPath = join(applicationDirectory, "app.json");
+  if (!existsSync(configurationPath)) return;
+
+  const configuration = JSON.parse(readFileSync(configurationPath, "utf-8")) as {
+    expo?: { plugins?: Array<string | unknown[]>; [key: string]: unknown };
+  };
+  const expo = configuration.expo ?? {};
+  const plugins = expo.plugins ?? [];
+  for (const plugin of ["expo-secure-store", "@clerk/expo"]) {
+    if (!plugins.some((entry) => entry === plugin || (Array.isArray(entry) && entry[0] === plugin))) {
+      plugins.push(plugin);
+    }
+  }
+  writeFileSync(configurationPath, `${JSON.stringify({ ...configuration, expo: { ...expo, plugins } }, null, 2)}\n`);
+}
+
+function applyClerkAuthentication(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
   onlyApp?: App,
 ): void {
-  if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
-    const integrations = adapterSourceDir(targetDir, config, "adapters-next");
-    mkdirSync(join(integrations, "auth"), { recursive: true });
+  if (configuration.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
+    const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-next");
+    mkdirSync(join(integrationsDirectory, "auth"), { recursive: true });
     renderModuleFile(
       "adapters/auth/clerk-next.ts",
-      join(integrations, "auth", "clerk.ts"),
-      vars,
+      join(integrationsDirectory, "auth", "clerk.ts"),
+      variables,
     );
     renderModuleFile(
       "scaffold/clerk-next-middleware.ts",
-      join(appSourceDir(targetDir, config, "web"), "proxy.ts"),
-      vars,
+      join(appSourceDirectory(targetDirectory, configuration, "web"), "proxy.ts"),
+      variables,
     );
     renderModuleFile(
       "scaffold/clerk-next-provider.tsx",
       join(
-        appSourceDir(targetDir, config, "web"),
+        appSourceDirectory(targetDirectory, configuration, "web"),
         "integrations",
         "auth",
         "authentication-provider.tsx",
       ),
-      vars,
+      variables,
     );
     renderModuleFile(
       "scaffold/captain-next-layout.tsx",
-      join(appSourceDir(targetDir, config, "web"), "app", "layout.tsx"),
-      vars,
+      join(appSourceDirectory(targetDirectory, configuration, "web"), "app", "layout.tsx"),
+      variables,
     );
-    mergePackageJson(integrationPackageJson(targetDir, config, "adapters-next"), {
+    mergePackageJson(integrationPackagePath(targetDirectory, configuration, "adapters-next"), {
       dependencies: {
         "@clerk/nextjs": testedRange("@clerk/nextjs"),
       },
     });
-    mergeAppPackageJson(targetDir, config, "web", {
+    mergeApplicationManifest(targetDirectory, configuration, "web", {
       dependencies: {
         "@clerk/nextjs": testedRange("@clerk/nextjs"),
       },
     });
   }
 
-  if (config.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
-    const integrations = adapterSourceDir(targetDir, config, "adapters-expo");
-    mkdirSync(join(integrations, "auth"), { recursive: true });
+  if (configuration.stacks.hasMobile && (!onlyApp || onlyApp === "mobile")) {
+    const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-expo");
+    mkdirSync(join(integrationsDirectory, "auth"), { recursive: true });
     renderModuleFile(
       "adapters/auth/clerk-expo.ts",
-      join(integrations, "auth", "clerk.ts"),
-      vars,
+      join(integrationsDirectory, "auth", "clerk.ts"),
+      variables,
     );
     renderModuleFile(
       "scaffold/clerk-expo-provider.tsx",
       join(
-        appSourceDir(targetDir, config, "mobile"),
+        appSourceDirectory(targetDirectory, configuration, "mobile"),
         "integrations",
         "auth",
         "authentication-provider.tsx",
       ),
-      vars,
+      variables,
     );
     renderModuleFile(
       "scaffold/captain-expo-app.tsx",
-      join(appSourceDir(targetDir, config, "mobile"), "app", "_layout.tsx"),
-      vars,
+      join(appSourceDirectory(targetDirectory, configuration, "mobile"), "app", "_layout.tsx"),
+      variables,
     );
-    const appJsonPath = join(appDir(targetDir, config, "mobile"), "app.json");
-    if (existsSync(appJsonPath)) {
-      const appJson = JSON.parse(readFileSync(appJsonPath, "utf-8")) as {
-        expo?: { plugins?: Array<string | unknown[]>; [key: string]: unknown };
-      };
-      const expo = appJson.expo ?? {};
-      const plugins = expo.plugins ?? [];
-      for (const plugin of ["expo-secure-store", "@clerk/expo"]) {
-        if (!plugins.some((entry) => entry === plugin || (Array.isArray(entry) && entry[0] === plugin))) {
-          plugins.push(plugin);
-        }
-      }
-      writeFileSync(appJsonPath, `${JSON.stringify({ ...appJson, expo: { ...expo, plugins } }, null, 2)}\n`);
-    }
-    mergePackageJson(integrationPackageJson(targetDir, config, "adapters-expo"), {
+    configureExpoAuthenticationPlugins(appDirectory(targetDirectory, configuration, "mobile"));
+    mergePackageJson(integrationPackagePath(targetDirectory, configuration, "adapters-expo"), {
       dependencies: {
         "@clerk/expo": testedRange("@clerk/expo"),
         "expo-secure-store": testedRange("expo-secure-store"),
@@ -336,7 +342,7 @@ function applyAuthClerk(
         "expo-crypto": testedRange("expo-crypto"),
       },
     });
-    mergeAppPackageJson(targetDir, config, "mobile", {
+    mergeApplicationManifest(targetDirectory, configuration, "mobile", {
       dependencies: {
         "@clerk/expo": testedRange("@clerk/expo"),
         "expo-secure-store": testedRange("expo-secure-store"),
@@ -347,24 +353,24 @@ function applyAuthClerk(
   }
 }
 
-function applyI18nWebGtNext(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+function applyWebTranslation(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
 ): void {
-  const integrations = adapterSourceDir(targetDir, config, "adapters-next");
-  mkdirSync(join(integrations, "i18n"), { recursive: true });
+  const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-next");
+  mkdirSync(join(integrationsDirectory, "i18n"), { recursive: true });
   renderModuleFile(
     "adapters/i18n/gt-next.ts",
-    join(integrations, "i18n", "gt-next.ts"),
-    vars,
+    join(integrationsDirectory, "i18n", "gt-next.ts"),
+    variables,
   );
-  mergePackageJson(integrationPackageJson(targetDir, config, "adapters-next"), {
+  mergePackageJson(integrationPackagePath(targetDirectory, configuration, "adapters-next"), {
     dependencies: {
       "gt-next": testedRange("gt-next"),
     },
   });
-  mergeAppPackageJson(targetDir, config, "web", {
+  mergeApplicationManifest(targetDirectory, configuration, "web", {
     dependencies: {
       "gt-next": testedRange("gt-next"),
     },
@@ -377,85 +383,85 @@ function applyI18nWebGtNext(
   });
 }
 
-function applyI18nMobileGtReactNative(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+function applyMobileTranslation(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
 ): void {
-  const integrations = adapterSourceDir(targetDir, config, "adapters-expo");
-  mkdirSync(join(integrations, "i18n"), { recursive: true });
+  const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-expo");
+  mkdirSync(join(integrationsDirectory, "i18n"), { recursive: true });
   renderModuleFile(
     "adapters/i18n/gt-react-native.ts",
-    join(integrations, "i18n", "gt-react-native.ts"),
-    vars,
+    join(integrationsDirectory, "i18n", "gt-react-native.ts"),
+    variables,
   );
-  mergePackageJson(integrationPackageJson(targetDir, config, "adapters-expo"), {
+  mergePackageJson(integrationPackagePath(targetDirectory, configuration, "adapters-expo"), {
     dependencies: {
       "gt-react-native": testedRange("gt-react-native"),
     },
   });
-  mergeAppPackageJson(targetDir, config, "mobile", {
+  mergeApplicationManifest(targetDirectory, configuration, "mobile", {
     dependencies: {
       "gt-react-native": testedRange("gt-react-native"),
     },
   });
 }
 
-function applyI18nEnforcement(targetDir: string, config: NormalizedProjectConfig, vars: RecipeVars): void {
-  const toolsDir = join(targetDir, "tools", "i18n");
-  mkdirSync(toolsDir, { recursive: true });
+function applyTranslationEnforcement(targetDirectory: string, configuration: NormalizedProjectConfiguration, variables: RecipeVariables): void {
+  const toolsDirectory = join(targetDirectory, "tools", "i18n");
+  mkdirSync(toolsDirectory, { recursive: true });
 
-  renderModuleFile("modules/i18n-enforcement/i18n-check.mjs", join(toolsDir, "i18n-check.mjs"), vars);
+  renderModuleFile("modules/i18n-enforcement/i18n-check.mjs", join(toolsDirectory, "i18n-check.mjs"), variables);
   renderModuleFile(
     "modules/i18n-enforcement/eslint-snippet.js",
-    join(toolsDir, "eslint-i18n-snippet.js"),
-    vars,
+    join(toolsDirectory, "eslint-i18n-snippet.js"),
+    variables,
   );
 
-  const i18nCheckScript =
-    `node tools/i18n/i18n-check.mjs --locales ${config.locales.join(",")} --default-locale ${config.defaultLocale}`;
+  const internationalizationCheckCommand =
+    `node tools/i18n/i18n-check.mjs --locales ${configuration.locales.join(",")} --default-locale ${configuration.defaultLocale}`;
 
-  mergePackageJson(join(targetDir, "package.json"), {
+  mergePackageJson(join(targetDirectory, "package.json"), {
     scripts: {
-      "i18n:check": i18nCheckScript,
+      "i18n:check": internationalizationCheckCommand,
     },
   });
 }
 
 function applyExpoLocalization(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
 ): void {
-  mergeAppPackageJson(targetDir, config, "mobile", {
+  mergeApplicationManifest(targetDirectory, configuration, "mobile", {
     dependencies: {
       "expo-localization": testedRange("expo-localization"),
     },
   });
-  mergePackageJson(integrationPackageJson(targetDir, config, "adapters-expo"), {
+  mergePackageJson(integrationPackagePath(targetDirectory, configuration, "adapters-expo"), {
     dependencies: {
       "expo-localization": testedRange("expo-localization"),
     },
   });
 }
 
-function applyUiWebShadcnBaseUi(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+function applyWebShadcnBaseUi(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
 ): void {
-  const integrations = adapterSourceDir(targetDir, config, "adapters-next");
-  mkdirSync(join(integrations, "ui"), { recursive: true });
+  const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-next");
+  mkdirSync(join(integrationsDirectory, "ui"), { recursive: true });
   renderModuleFile(
     "adapters/ui/shadcn-base-ui.ts",
-    join(integrations, "ui", "shadcn.ts"),
-    vars,
+    join(integrationsDirectory, "ui", "shadcn.ts"),
+    variables,
   );
   renderModuleFile(
     "scaffold/shadcn-components.json",
-    join(appDir(targetDir, config, "web"), "components.json"),
-    vars,
+    join(appDirectory(targetDirectory, configuration, "web"), "components.json"),
+    variables,
   );
-  mergeAppPackageJson(targetDir, config, "web", {
+  mergeApplicationManifest(targetDirectory, configuration, "web", {
     devDependencies: {
       shadcn: testedRange("shadcn"),
     },
@@ -465,56 +471,57 @@ function applyUiWebShadcnBaseUi(
   });
 }
 
-function applyUiMobileNativewind(
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+function applyMobileNativewind(
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
 ): void {
-  const integrations = adapterSourceDir(targetDir, config, "adapters-expo");
-  mkdirSync(join(integrations, "ui"), { recursive: true });
+  const integrationsDirectory = adapterSourceDirectory(targetDirectory, configuration, "adapters-expo");
+  mkdirSync(join(integrationsDirectory, "ui"), { recursive: true });
   renderModuleFile(
     "adapters/ui/nativewind.ts",
-    join(integrations, "ui", "nativewind.ts"),
-    vars,
+    join(integrationsDirectory, "ui", "nativewind.ts"),
+    variables,
   );
   renderModuleFile(
     "scaffold/nativewind-metro.js",
-    join(appDir(targetDir, config, "mobile"), "metro.config.js"),
-    vars,
+    join(appDirectory(targetDirectory, configuration, "mobile"), "metro.config.js"),
+    variables,
   );
   renderModuleFile(
     "scaffold/nativewind-global.css",
-    join(appSourceDir(targetDir, config, "mobile"), "global.css"),
-    vars,
+    join(appSourceDirectory(targetDirectory, configuration, "mobile"), "global.css"),
+    variables,
   );
   renderModuleFile(
     "scaffold/nativewind-env.d.ts",
-    join(appSourceDir(targetDir, config, "mobile"), "nativewind-env.d.ts"),
-    vars,
+    join(appSourceDirectory(targetDirectory, configuration, "mobile"), "nativewind-env.d.ts"),
+    variables,
   );
-  renderModuleFile(
-    "scaffold/expo-eslint.config.js",
-    join(appDir(targetDir, config, "mobile"), "eslint.config.js"),
-    vars,
-  );
+  const mobileDirectory = appDirectory(targetDirectory, configuration, "mobile");
+  const hasEslintConfiguration = ["js", "mjs", "cjs", "ts", "mts", "cts"]
+    .some((extension) => existsSync(join(mobileDirectory, `eslint.config.${extension}`)));
+  if (!hasEslintConfiguration) {
+    renderModuleFile("scaffold/expo-eslint.config.js", join(mobileDirectory, "eslint.config.js"), variables);
+  }
   renderModuleFile(
     "scaffold/nativewind-tailwind.config.js",
-    join(appDir(targetDir, config, "mobile"), "tailwind.config.js"),
-    vars,
+    join(appDirectory(targetDirectory, configuration, "mobile"), "tailwind.config.js"),
+    variables,
   );
   renderModuleFile(
     "scaffold/nativewind-babel.config.js",
-    join(appDir(targetDir, config, "mobile"), "babel.config.js"),
-    vars,
+    join(appDirectory(targetDirectory, configuration, "mobile"), "babel.config.js"),
+    variables,
   );
-  if (config.auth === "none") {
+  if (configuration.auth === "none") {
     renderModuleFile(
       "scaffold/captain-expo-layout-no-auth.tsx",
-      join(appSourceDir(targetDir, config, "mobile"), "app", "_layout.tsx"),
-      vars,
+      join(appSourceDirectory(targetDirectory, configuration, "mobile"), "app", "_layout.tsx"),
+      variables,
     );
   }
-  mergeAppPackageJson(targetDir, config, "mobile", {
+  mergeApplicationManifest(targetDirectory, configuration, "mobile", {
     dependencies: {
       nativewind: testedRange("nativewind"),
       "react-native-css-interop": testedRange("react-native-css-interop"),
@@ -534,70 +541,80 @@ function applyUiMobileNativewind(
   });
 }
 
-const WORKSPACE_CONFIG_STEPS = new Set([
+const WORKSPACE_CONFIGURATION_STEPS = new Set([
   "project-structure",
   "context-md",
   "env-example",
+  "agent-guidance",
+  "starter-documentation",
+  "expo-starter-ref",
+  "expo-starter-lint",
 ]);
 
 function applyRecipeStep(
   step: RecipeStep,
-  targetDir: string,
-  config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfiguration,
+  variables: RecipeVariables,
 ): void {
   switch (step.id) {
+    case "code-standards":
+      applyCodeStandards(configuration, targetDirectory);
+      break;
     case "backend-rest":
-      applyBackendRest(targetDir, config, vars);
+      applyBackendRest(targetDirectory, configuration, variables);
       break;
     case "backend-convex":
-      applyBackendConvex(targetDir, config, vars);
+      applyBackendConvex(targetDirectory, configuration, variables);
       break;
     case "module-authorization":
-      applyModuleAuthorization(targetDir, config, vars);
+      applyModuleAuthorization(targetDirectory, configuration, variables);
       break;
     case "auth-clerk":
-      applyAuthClerk(targetDir, config, vars);
+      applyClerkAuthentication(targetDirectory, configuration, variables);
       break;
     case "i18n-web-gt-next":
-      applyI18nWebGtNext(targetDir, config, vars);
+      applyWebTranslation(targetDirectory, configuration, variables);
       break;
     case "i18n-mobile-gt-react-native":
-      applyI18nMobileGtReactNative(targetDir, config, vars);
+      applyMobileTranslation(targetDirectory, configuration, variables);
       break;
     case "i18n-enforcement":
-      applyI18nEnforcement(targetDir, config, vars);
+      applyTranslationEnforcement(targetDirectory, configuration, variables);
       break;
     case "expo-localization":
-      applyExpoLocalization(targetDir, config);
+      applyExpoLocalization(targetDirectory, configuration);
       break;
     case "ui-web-shadcn-base-ui":
-      applyUiWebShadcnBaseUi(targetDir, config, vars);
+      applyWebShadcnBaseUi(targetDirectory, configuration, variables);
       break;
     case "ui-mobile-nativewind":
-      applyUiMobileNativewind(targetDir, config, vars);
+      applyMobileNativewind(targetDirectory, configuration, variables);
       break;
     default:
       throw new Error(`Recipe step "${step.id}" is not implemented`);
   }
 }
 
+/** Applies selected integrations and optional standards after framework scaffolding. */
 export function applyRecipes(
-  config: NormalizedProjectConfig,
-  targetDir: string,
+  configuration: NormalizedProjectConfiguration,
+  targetDirectory: string,
   options: {
+    /** Reports an integration step immediately before it is applied. */
     onStepStart?: (step: RecipeStep) => void;
+    /** Reports successful completion of an integration step. */
     onStepComplete?: (step: RecipeStep) => void;
   } = {},
 ): ApplyRecipesResult {
-  const vars = buildRecipeVars(config);
-  const steps = resolveRecipePlan(config).filter((step) => !WORKSPACE_CONFIG_STEPS.has(step.id));
+  const variables = buildRecipeVariables(configuration);
+  const steps = resolveRecipePlan(configuration).filter((step) => !WORKSPACE_CONFIGURATION_STEPS.has(step.id));
   const applied = new Set<string>();
 
   for (const step of steps) {
     try {
       options.onStepStart?.(step);
-      applyRecipeStep(step, targetDir, config, vars);
+      applyRecipeStep(step, targetDirectory, configuration, variables);
       applied.add(step.id);
       options.onStepComplete?.(step);
     } catch (error) {

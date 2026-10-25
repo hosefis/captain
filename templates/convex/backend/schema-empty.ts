@@ -1,4 +1,4 @@
 import { defineSchema } from "convex/server";
 
-// Add tables here, then run `npx convex dev` to regenerate typed bindings.
+/** Defines an empty backend ready for application tables. */
 export default defineSchema({});

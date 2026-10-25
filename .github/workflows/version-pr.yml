@@ -84,7 +84,7 @@ jobs:
         run: |
           branch="release/version-pr-$PR_NUMBER"
           git checkout -B "$branch" origin/dev
-          EXPECTED_VERSION="$EXPECTED_VERSION" node -e 'const fs=require("fs");const p=JSON.parse(fs.readFileSync("package.json","utf8"));p.version=process.env.EXPECTED_VERSION;fs.writeFileSync("package.json",JSON.stringify(p,null,2)+"\n")'
+          EXPECTED_VERSION="$EXPECTED_VERSION" node -e 'const filesystem=require("fs");const manifest=JSON.parse(filesystem.readFileSync("package.json","utf8"));manifest.version=process.env.EXPECTED_VERSION;filesystem.writeFileSync("package.json",JSON.stringify(manifest,null,2)+"\n")'
           git add package.json
           git -c user.name='captain-release[bot]' -c user.email='captain-release[bot]@users.noreply.github.com' commit -m "chore(release): bump version to $EXPECTED_VERSION" -m 'Set the package version calculated from merged pull request titles on dev.'
           git push --force-with-lease origin "HEAD:refs/heads/$branch"

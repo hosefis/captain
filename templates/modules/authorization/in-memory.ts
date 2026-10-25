@@ -1,10 +1,11 @@
 import type {
-  AuthDecision,
+  AuthorizationDecision,
   AuthorizationAction,
   AuthorizationAdapter,
   AuthorizationClaims,
 } from "./types.js";
 
+/** Evaluates role and resource rules without an external authorization service. */
 export function createInMemoryAuthorizationAdapter(
   rules: Array<{
     role: string;
@@ -13,7 +14,8 @@ export function createInMemoryAuthorizationAdapter(
   }>,
 ): AuthorizationAdapter {
   return {
-    authorize(action: AuthorizationAction, claims: AuthorizationClaims): AuthDecision {
+    /** Evaluates the configured role rules for a resource action. */
+    authorize(action: AuthorizationAction, claims: AuthorizationClaims): AuthorizationDecision {
       const allowed = rules.some(
         (rule) =>
           claims.roles.includes(rule.role) &&

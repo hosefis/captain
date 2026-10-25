@@ -1,22 +1,22 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { captainPackageRoot } from "../lib/paths.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
-export type DocVersionEntry = {
+export type DocumentationVersionEntry = {
   validated: string;
   docs?: string;
 };
 
-export type DocVersionsManifest = {
+export type DocumentationVersionsManifest = {
   version: number;
   validatedAt: string;
-  packages: Record<string, DocVersionEntry>;
+  packages: Record<string, DocumentationVersionEntry>;
 };
 
 export type DriftLevel = "none" | "patch" | "minor" | "major" | "unknown";
 
-export type DocDriftEntry = {
+export type DocumentationDriftEntry = {
   package: string;
   bundled: string | null;
   npmLatest: string | null;
@@ -25,26 +25,27 @@ export type DocDriftEntry = {
   fetchError?: string;
 };
 
-export type VerifyDocsIssue = {
+export type DocumentationVerificationIssue = {
   package: string;
   message: string;
 };
 
-export type VerifyDocsResult = {
+export type DocumentationVerificationResult = {
   ok: boolean;
   validatedAt: string;
-  entries: DocDriftEntry[];
-  blocks: VerifyDocsIssue[];
-  warns: VerifyDocsIssue[];
+  entries: DocumentationDriftEntry[];
+  blocks: DocumentationVerificationIssue[];
+  warns: DocumentationVerificationIssue[];
 };
 
 export type NpmFetchResult =
   | { ok: true; version: string }
   | { ok: false; error: string };
 
+/** Retrieve a package's latest registry version without changing project dependencies. */
 export type NpmFetch = (packageName: string) => Promise<NpmFetchResult>;
 
-function findDocVersionsPath(): string {
+function findDocumentationVersionsPath(): string {
   const root = captainPackageRoot();
   const candidate = join(root, "doc-versions.json");
   if (existsSync(candidate)) {
@@ -53,33 +54,35 @@ function findDocVersionsPath(): string {
   throw new Error("doc-versions.json not found");
 }
 
-export function loadDocVersionsManifest(): DocVersionsManifest {
-  const raw = readFileSync(findDocVersionsPath(), "utf8");
-  return JSON.parse(raw) as DocVersionsManifest;
+/** Load the dependency versions validated against the bundled recipes. */
+export function loadDocumentationVersionsManifest(): DocumentationVersionsManifest {
+  const raw = readFileSync(findDocumentationVersionsPath(), "utf8");
+  return JSON.parse(raw) as DocumentationVersionsManifest;
 }
 
-export function resolvePackagesForConfig(config: NormalizedProjectConfig): string[] {
+/** List registry packages used by the selected framework and integrations. */
+export function resolvePackagesForConfiguration(configuration: NormalizedProjectConfiguration): string[] {
   const packages = new Set<string>();
 
-  if (config.topology === "web" || config.stacks.hasWeb) {
+  if (configuration.topology === "web" || configuration.stacks.hasWeb) {
     packages.add("create-next-app");
   }
-  if (config.topology === "mobile" || config.stacks.hasMobile) {
+  if (configuration.topology === "mobile" || configuration.stacks.hasMobile) {
     packages.add("create-expo-app");
   }
-  if (config.topology === "monorepo") {
+  if (configuration.topology === "monorepo") {
     packages.add("create-turbo");
   }
 
-  if (config.backend === "convex") {
+  if (configuration.backend === "convex") {
     packages.add("convex");
   }
 
-  if (config.auth === "clerk") {
-    if (config.stacks.hasWeb) {
+  if (configuration.auth === "clerk") {
+    if (configuration.stacks.hasWeb) {
       packages.add("@clerk/nextjs");
     }
-    if (config.stacks.hasMobile) {
+    if (configuration.stacks.hasMobile) {
       packages.add("@clerk/expo");
       packages.add("expo-secure-store");
       packages.add("expo-auth-session");
@@ -87,24 +90,24 @@ export function resolvePackagesForConfig(config: NormalizedProjectConfig): strin
     }
   }
 
-  if (config.i18n.web === "gt-next") {
+  if (configuration.i18n.web === "gt-next") {
     packages.add("gt-next");
     packages.add("gtx-cli");
   }
 
-  if (config.i18n.mobile === "gt-react-native") {
+  if (configuration.i18n.mobile === "gt-react-native") {
     packages.add("gt-react-native");
   }
 
-  if (config.i18n.mobile === "gt-react-native") {
+  if (configuration.i18n.mobile === "gt-react-native") {
     packages.add("expo-localization");
   }
 
-  if (config.ui.web === "shadcn-base-ui") {
+  if (configuration.ui.web === "shadcn-base-ui") {
     packages.add("shadcn");
   }
 
-  if (config.ui.mobile === "nativewind") {
+  if (configuration.ui.mobile === "nativewind") {
     packages.add("nativewind");
     packages.add("react-native-css-interop");
     packages.add("tailwindcss");
@@ -120,7 +123,7 @@ export function resolvePackagesForConfig(config: NormalizedProjectConfig): strin
   return [...packages].sort();
 }
 
-function parseSemver(version: string): { major: number; minor: number; patch: number } | null {
+function parseSemanticVersion(version: string): { major: number; minor: number; patch: number } | null {
   const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
   if (!match) {
     return null;
@@ -132,9 +135,10 @@ function parseSemver(version: string): { major: number; minor: number; patch: nu
   };
 }
 
+/** Classify how far a registry version has advanced beyond the validated baseline. */
 export function classifyDrift(bundled: string, npmLatest: string): DriftLevel {
-  const base = parseSemver(bundled);
-  const latest = parseSemver(npmLatest);
+  const base = parseSemanticVersion(bundled);
+  const latest = parseSemanticVersion(npmLatest);
   if (!base || !latest) {
     return bundled === npmLatest ? "none" : "unknown";
   }
@@ -156,6 +160,7 @@ export function classifyDrift(bundled: string, npmLatest: string): DriftLevel {
   return "none";
 }
 
+/** Fetch the npm latest version and return registry or transport failures as data. */
 export async function fetchNpmLatestVersion(packageName: string): Promise<NpmFetchResult> {
   const encoded = packageName.replace("/", "%2F");
   const url = `https://registry.npmjs.org/${encoded}/latest`;
@@ -179,11 +184,11 @@ export async function fetchNpmLatestVersion(packageName: string): Promise<NpmFet
 }
 
 function buildIssues(
-  entries: DocDriftEntry[],
+  entries: DocumentationDriftEntry[],
   agentMode: boolean,
-): Pick<VerifyDocsResult, "blocks" | "warns" | "ok"> {
-  const blocks: VerifyDocsIssue[] = [];
-  const warns: VerifyDocsIssue[] = [];
+): Pick<DocumentationVerificationResult, "blocks" | "warns" | "ok"> {
+  const blocks: DocumentationVerificationIssue[] = [];
+  const warns: DocumentationVerificationIssue[] = [];
 
   for (const entry of entries) {
     if (entry.fetchError) {
@@ -225,15 +230,16 @@ function buildIssues(
   return { blocks, warns, ok: blocks.length === 0 };
 }
 
-export async function runVerifyDocs(
-  config: NormalizedProjectConfig,
-  options: { agentMode: boolean; npmFetch?: NpmFetch; manifest?: DocVersionsManifest },
-): Promise<VerifyDocsResult> {
-  const manifest = options.manifest ?? loadDocVersionsManifest();
+/** Compare selected dependencies with npm and apply execution-mode drift policy. */
+export async function verifyDocumentationVersions(
+  configuration: NormalizedProjectConfiguration,
+  options: { agentMode: boolean; npmFetch?: NpmFetch; manifest?: DocumentationVersionsManifest },
+): Promise<DocumentationVerificationResult> {
+  const manifest = options.manifest ?? loadDocumentationVersionsManifest();
   const npmFetch = options.npmFetch ?? fetchNpmLatestVersion;
-  const selected = resolvePackagesForConfig(config);
+  const selected = resolvePackagesForConfiguration(configuration);
 
-  const entries: DocDriftEntry[] = [];
+  const entries: DocumentationDriftEntry[] = [];
 
   for (const packageName of selected) {
     const baseline = manifest.packages[packageName];
@@ -273,7 +279,8 @@ export async function runVerifyDocs(
   };
 }
 
-export function formatVerifyDocsReport(result: VerifyDocsResult): string {
+/** Render dependency baselines, drift, and blocking or advisory diagnostics. */
+export function formatDocumentationVersionReport(result: DocumentationVerificationResult): string {
   const lines = [
     `Doc version drift report (bundled baseline: ${result.validatedAt})`,
     "",

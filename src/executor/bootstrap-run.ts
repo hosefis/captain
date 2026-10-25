@@ -3,14 +3,18 @@ import { join } from "node:path";
 import { execa } from "execa";
 import type { BootstrapStep } from "../resolver/bootstrap.js";
 
+/** Execute one scaffold command and capture its process result. */
 export type BootstrapRunner = (
   step: BootstrapStep,
 ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 
 export type RunBootstrapOptions = {
-  cwd?: string;
+  workingDirectory?: string;
+  /** Replace command execution while preserving bootstrap sequencing. */
   runner?: BootstrapRunner;
+  /** Announce the command about to run. */
   onStepStart?: (step: BootstrapStep) => void;
+  /** Announce a successfully completed command. */
   onStepComplete?: (step: BootstrapStep) => void;
 };
 
@@ -21,8 +25,8 @@ async function defaultRunner(
     return { exitCode: 0, stdout: "", stderr: "" };
   }
 
-  const result = await execa(step.command, step.args, {
-    cwd: step.cwd,
+  const result = await execa(step.command, step.commandArguments, {
+    cwd: step.workingDirectory,
     stdio: ["ignore", "pipe", "pipe"],
     reject: false,
   });
@@ -40,12 +44,12 @@ async function prepareAppTarget(step: BootstrapStep): Promise<void> {
     return;
   }
 
-  const appArg = step.args.find((arg) => arg.startsWith("apps/"));
-  if (!appArg) {
+  const appArgument = step.commandArguments.find((argument) => argument.startsWith("apps/"));
+  if (!appArgument) {
     return;
   }
 
-  const appPath = join(step.cwd, appArg);
+  const appPath = join(step.workingDirectory, appArgument);
   await rm(appPath, { recursive: true, force: true });
 }
 
@@ -53,6 +57,7 @@ export type BootstrapRunResult =
   | { ok: true; completedSteps: string[] }
   | { ok: false; failedStep: BootstrapStep; exitCode: number; stderr: string };
 
+/** Execute scaffold commands in order, stopping at the first failure. */
 export async function runBootstrapPlan(
   steps: BootstrapStep[],
   options: RunBootstrapOptions = {},

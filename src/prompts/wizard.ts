@@ -1,19 +1,19 @@
-import * as p from "@clack/prompts";
+import * as prompts from "@clack/prompts";
 import {
   detectPackageManagers,
   type PackageManagerAvailability,
 } from "../lib/package-manager-availability.js";
 import {
-  parseProjectConfig,
-  type Auth,
+  parseProjectConfiguration,
+  type Authentication,
   type Backend,
   type ExpoRuntime,
-  type NormalizedProjectConfig,
+  type NormalizedProjectConfiguration,
   type PackageManager,
   type Topology,
-} from "../schema/project-config.js";
+} from "../schema/project-configuration.js";
 import {
-  compatibleMobileI18n,
+  compatibleMobileInternationalization,
   SUPPORTED_OPTIONS,
   type SupportedOption,
 } from "../supported-options.js";
@@ -21,7 +21,7 @@ import {
 type WizardResult =
   | { cancelled: true }
   | { error: string }
-  | { cancelled: false; config: NormalizedProjectConfig };
+  | { cancelled: false; configuration: NormalizedProjectConfiguration };
 
 const packageManagers: readonly PackageManager[] = ["pnpm", "npm", "bun"];
 
@@ -38,13 +38,14 @@ function unavailableMessage(
 }
 
 function cancelIfNeeded<T>(value: T | symbol): value is symbol {
-  if (p.isCancel(value)) {
-    p.cancel("Init cancelled.");
+  if (prompts.isCancel(value)) {
+    prompts.cancel("Init cancelled.");
     return true;
   }
   return false;
 }
 
+/** Derives the workspace package scope from the project name. */
 export function deriveScopeFromProjectName(name: string): string {
   return `@${name.trim().toLowerCase()}`;
 }
@@ -58,7 +59,7 @@ async function selectSupported(
     return options[0]!.value;
   }
 
-  return p.select<string>({
+  return prompts.select<string>({
     message,
     options: options.map((option) => ({
       value: option.value,
@@ -68,33 +69,35 @@ async function selectSupported(
   });
 }
 
-function summary(config: NormalizedProjectConfig): string {
+function summary(configuration: NormalizedProjectConfiguration): string {
   const lines = [
-    `Project: ${config.name}`,
-    `Package manager: ${config.packageManager}`,
-    `Topology: ${config.topology}`,
+    `Project: ${configuration.name}`,
+    `Package manager: ${configuration.packageManager}`,
+    `Topology: ${configuration.topology}`,
   ];
-  if (config.runtime) {
-    lines.push(`Expo runtime: ${config.runtime}`);
+  if (configuration.runtime) {
+    lines.push(`Expo runtime: ${configuration.runtime}`);
   }
   lines.push(
-    `Authentication: ${config.auth}`,
-    `Backend: ${config.backend}`,
-    `Convex example: ${config.convexExample ? "yes" : "no"}`,
-    `Web i18n: ${config.i18n.web ?? "n/a"}`,
-    `Mobile i18n: ${config.i18n.mobile ?? "n/a"}`,
-    `Web UI: ${config.ui.web ?? "n/a"}`,
-    `Mobile UI: ${config.ui.mobile ?? "n/a"}`,
+    `Authentication: ${configuration.auth}`,
+    `Backend: ${configuration.backend}`,
+    `Convex example: ${configuration.convexExample ? "yes" : "no"}`,
+    `Code standards enforcement: ${configuration.enforceCodeStandards ? "yes" : "no"}`,
+    `Web i18n: ${configuration.i18n.web ?? "n/a"}`,
+    `Mobile i18n: ${configuration.i18n.mobile ?? "n/a"}`,
+    `Web UI: ${configuration.ui.web ?? "n/a"}`,
+    `Mobile UI: ${configuration.ui.mobile ?? "n/a"}`,
   );
-  if (config.i18n.web !== undefined || config.i18n.mobile !== "none") {
+  if (configuration.i18n.web !== undefined || configuration.i18n.mobile !== "none") {
     lines.push(
-      `Locales: ${config.locales.join(", ")}`,
-      `Default locale: ${config.defaultLocale}`,
+      `Locales: ${configuration.locales.join(", ")}`,
+      `Default locale: ${configuration.defaultLocale}`,
     );
   }
   return lines.join("\n");
 }
 
+/** Collects compatible scaffold choices and confirms the resolved configuration. */
 export async function runWizard(
   options: {
     yes?: boolean;
@@ -109,9 +112,9 @@ export async function runWizard(
       error: "No package manager passed its version check. Install pnpm, npm, or bun and retry.",
     };
   }
-  p.intro("CAPTAIN — Create Apps Properly");
+  prompts.intro("CAPTAIN — Create Apps Properly");
 
-  const name = await p.text({
+  const name = await prompts.text({
     message: "Project name (kebab-case)",
     placeholder: "acme-platform",
     validate: (value) => {
@@ -147,7 +150,7 @@ export async function runWizard(
     if (!options.dryRun) {
       return { error: message };
     }
-    p.log.warn(`Dry run only: ${message} A real run would stop here.`);
+    prompts.log.warn(`Dry run only: ${message} A real run would stop here.`);
   }
 
   const topology = await selectSupported(
@@ -175,12 +178,12 @@ export async function runWizard(
     runtime = selectedRuntime as ExpoRuntime;
   }
 
-  const auth = await selectSupported(
+  const authentication = await selectSupported(
     "Authentication",
     SUPPORTED_OPTIONS.authentication,
     "clerk",
   );
-  if (cancelIfNeeded(auth)) {
+  if (cancelIfNeeded(authentication)) {
     return { cancelled: true };
   }
 
@@ -195,7 +198,7 @@ export async function runWizard(
 
   let convexExample = false;
   if (backend === "convex") {
-    const selectedExample = await p.confirm({
+    const selectedExample = await prompts.confirm({
       message: "Include a working Convex task list example?",
       initialValue: false,
     });
@@ -205,21 +208,21 @@ export async function runWizard(
     convexExample = selectedExample;
   }
 
-  const mobileI18n = runtime
+  const mobileInternationalization = runtime
     ? (await selectSupported(
         "Mobile internationalization",
-        compatibleMobileI18n(runtime),
+        compatibleMobileInternationalization(runtime),
       ))
     : undefined;
-  if (mobileI18n !== undefined && cancelIfNeeded(mobileI18n)) {
+  if (mobileInternationalization !== undefined && cancelIfNeeded(mobileInternationalization)) {
     return { cancelled: true };
   }
 
-  const hasI18n = hasWeb || mobileI18n !== "none";
+  const hasInternationalization = hasWeb || mobileInternationalization !== "none";
   let locales = ["en", "fr"];
   let defaultLocale = "en";
-  if (hasI18n) {
-    const localesInput = await p.text({
+  if (hasInternationalization) {
+    const localesInput = await prompts.text({
       message: "Locales (comma-separated)",
       placeholder: "en, fr",
       initialValue: "en, fr",
@@ -236,60 +239,69 @@ export async function runWizard(
       .map((entry) => entry.trim())
       .filter(Boolean);
 
-    const selectedDefault = await p.select({
+    const selectedDefaultLocale = await prompts.select({
       message: "Default locale",
       options: locales.map((locale) => ({ value: locale, label: locale })),
       initialValue: locales[0],
     });
-    if (cancelIfNeeded(selectedDefault)) {
+    if (cancelIfNeeded(selectedDefaultLocale)) {
       return { cancelled: true };
     }
-    defaultLocale = selectedDefault;
+    defaultLocale = selectedDefaultLocale;
   }
 
-  const config = parseProjectConfig({
+  const enforceCodeStandards = await prompts.confirm({
+    message: "Enforce code standards during lint?",
+    initialValue: false,
+  });
+  if (cancelIfNeeded(enforceCodeStandards)) {
+    return { cancelled: true };
+  }
+
+  const configuration = parseProjectConfiguration({
     name: name.trim(),
     scope: deriveScopeFromProjectName(name),
     packageManager: packageManager as PackageManager,
     topology: topology as Topology,
     backend: backend as Backend,
     convexExample,
-    auth: auth as Auth,
+    enforceCodeStandards,
+    auth: authentication as Authentication,
     i18n:
       topology === "monorepo"
         ? {
-            web: SUPPORTED_OPTIONS.webI18n[0].value,
-            mobile: mobileI18n,
+            web: SUPPORTED_OPTIONS.webInternationalization[0].value,
+            mobile: mobileInternationalization,
           }
         : topology === "web"
-          ? SUPPORTED_OPTIONS.webI18n[0].value
-          : mobileI18n,
+          ? SUPPORTED_OPTIONS.webInternationalization[0].value
+          : mobileInternationalization,
     ui:
       topology === "monorepo"
         ? {
-            web: SUPPORTED_OPTIONS.webUi[0].value,
-            mobile: SUPPORTED_OPTIONS.mobileUi[0].value,
+            web: SUPPORTED_OPTIONS.webUserInterface[0].value,
+            mobile: SUPPORTED_OPTIONS.mobileUserInterface[0].value,
           }
         : topology === "web"
-          ? SUPPORTED_OPTIONS.webUi[0].value
-          : SUPPORTED_OPTIONS.mobileUi[0].value,
+          ? SUPPORTED_OPTIONS.webUserInterface[0].value
+          : SUPPORTED_OPTIONS.mobileUserInterface[0].value,
     locales,
     defaultLocale,
     runtime,
   });
 
-  p.note(summary(config), "Configuration");
+  prompts.note(summary(configuration), "Configuration");
   if (!options.yes) {
-    const confirmed = await p.confirm({
+    const confirmed = await prompts.confirm({
       message: "Create this project?",
       initialValue: true,
     });
     if (cancelIfNeeded(confirmed) || !confirmed) {
-      p.cancel("Init cancelled.");
+      prompts.cancel("Init cancelled.");
       return { cancelled: true };
     }
   }
 
-  p.outro("Configuration confirmed");
-  return { cancelled: false, config };
+  prompts.outro("Configuration confirmed");
+  return { cancelled: false, configuration };
 }

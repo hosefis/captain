@@ -6,8 +6,8 @@ const sampleStep: BootstrapStep = {
   id: "bootstrap-web",
   description: "test",
   command: "pnpm",
-  args: ["dlx", "create-next-app@latest"],
-  cwd: "/tmp/test",
+  commandArguments: ["dlx", "create-next-app@latest"],
+  workingDirectory: "/tmp/test",
 };
 
 describe("runBootstrapPlan", () => {
@@ -33,8 +33,8 @@ describe("runBootstrapPlan", () => {
       id: "bootstrap-apps-desktop",
       description: "slot",
       command: "(slot)",
-      args: [],
-      cwd: "/tmp/test",
+      commandArguments: [],
+      workingDirectory: "/tmp/test",
     };
 
     let runnerCalls = 0;
@@ -70,11 +70,11 @@ describe("runBootstrapPlan", () => {
       {
         ...sampleStep,
         command: process.execPath,
-        args: [
+        commandArguments: [
           "-e",
           "console.error('visible bootstrap failure'); process.exit(1)",
         ],
-        cwd: process.cwd(),
+        workingDirectory: process.cwd(),
       },
     ]);
 

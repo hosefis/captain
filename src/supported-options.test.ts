@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compatibleMobileI18n, SUPPORTED_OPTIONS } from "./supported-options.js";
+import { compatibleMobileInternationalization, SUPPORTED_OPTIONS } from "./supported-options.js";
 
 describe("supported option registry", () => {
   it("exposes only implemented integrations", () => {
@@ -14,10 +14,10 @@ describe("supported option registry", () => {
   });
 
   it("progressively filters mobile i18n by runtime", () => {
-    expect(compatibleMobileI18n("expo-go").map(({ value }) => value)).toEqual([
+    expect(compatibleMobileInternationalization("expo-go").map(({ value }) => value)).toEqual([
       "none",
     ]);
-    expect(compatibleMobileI18n("dev-build").map(({ value }) => value)).toEqual([
+    expect(compatibleMobileInternationalization("dev-build").map(({ value }) => value)).toEqual([
       "gt-react-native",
     ]);
   });
