@@ -209,6 +209,10 @@ describe("Tier A golden fixtures (pre-publish matrix)", () => {
 });
 
 describe("enabled scaffolds with distributed checker assets (requires M1 integration)", () => {
+  const checkerProcessTimeoutMilliseconds = 10_000;
+  // Both CLI runs build a compiler program for each workspace configuration.
+  const checkerCaseTimeoutMilliseconds = 2 * checkerProcessTimeoutMilliseconds + 5_000;
+
   for (const fixture of tierAFixtures) {
     it(`checks ${fixture.id} editable source and excludes external generated bindings`, async () => {
       const directory = createTemporaryDirectory(`standards-${fixture.id}`);
@@ -231,12 +235,16 @@ describe("enabled scaffolds with distributed checker assets (requires M1 integra
       );
       mkdirSync(join(directory, "convex/_generated"), { recursive: true });
       writeFileSync(join(directory, "convex/_generated/invalid.ts"), 'export * from "external-generated";\n');
-      const checked = spawnSync(process.execPath, ["tools/check-code-standards.mjs"], { cwd: directory, encoding: "utf-8" });
+      const checked = spawnSync(process.execPath, ["tools/check-code-standards.mjs"], {
+        cwd: directory, encoding: "utf-8", timeout: checkerProcessTimeoutMilliseconds,
+      });
       expect({ status: checked.status, stdout: checked.stdout, stderr: checked.stderr }).toMatchObject({ status: 0 });
       writeFileSync(join(directory, "maintained-negative.ts"), "export function undocumented() {}\n");
-      const rejected = spawnSync(process.execPath, ["tools/check-code-standards.mjs"], { cwd: directory, encoding: "utf-8" });
+      const rejected = spawnSync(process.execPath, ["tools/check-code-standards.mjs"], {
+        cwd: directory, encoding: "utf-8", timeout: checkerProcessTimeoutMilliseconds,
+      });
       expect(rejected.status).toBe(1);
       expect(`${rejected.stdout}${rejected.stderr}`).toContain("maintained-negative.ts");
-    });
+    }, checkerCaseTimeoutMilliseconds);
   }
 });
