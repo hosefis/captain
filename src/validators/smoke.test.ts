@@ -10,9 +10,9 @@ import {
   smokeFixHint,
   type SmokeRunner,
 } from "./smoke.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
-const tierAWebConfig: NormalizedProjectConfig = {
+const tierAWebConfiguration: NormalizedProjectConfiguration = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",
@@ -20,6 +20,7 @@ const tierAWebConfig: NormalizedProjectConfig = {
   apps: ["web"],
   backend: "rest",
   convexExample: false,
+  enforceCodeStandards: false,
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
@@ -28,10 +29,10 @@ const tierAWebConfig: NormalizedProjectConfig = {
   stacks: { hasWeb: true, hasMobile: false },
 };
 
-function makeTempDir(): string {
-  const dir = join(tmpdir(), `captain-smoke-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(dir, { recursive: true });
-  return dir;
+function makeTemporaryDirectory(): string {
+  const directory = join(tmpdir(), `captain-smoke-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  mkdirSync(directory, { recursive: true });
+  return directory;
 }
 
 function writeRootPackageJson(
@@ -47,11 +48,11 @@ function writeRootPackageJson(
 
 describe("resolveSmokeSteps", () => {
   it("includes build for agent mode", () => {
-    expect(resolveSmokeSteps(tierAWebConfig, true)).toEqual(["typecheck", "lint", "build"]);
+    expect(resolveSmokeSteps(tierAWebConfiguration, true)).toEqual(["typecheck", "lint", "build"]);
   });
 
   it("omits build for human mode", () => {
-    expect(resolveSmokeSteps(tierAWebConfig, false)).toEqual(["typecheck", "lint"]);
+    expect(resolveSmokeSteps(tierAWebConfiguration, false)).toEqual(["typecheck", "lint"]);
   });
 });
 
@@ -59,21 +60,21 @@ describe("resolveSmokeCommand", () => {
   it("uses pnpm run by default", () => {
     expect(resolveSmokeCommand("typecheck", "pnpm")).toEqual({
       command: "pnpm",
-      args: ["run", "typecheck"],
+      commandArguments: ["run", "typecheck"],
     });
   });
 
   it("uses npm run for npm projects", () => {
     expect(resolveSmokeCommand("lint", "npm")).toEqual({
       command: "npm",
-      args: ["run", "lint"],
+      commandArguments: ["run", "lint"],
     });
   });
 });
 
 describe("runSmokeValidation", () => {
   it("runs steps in order with injected runner", async () => {
-    const directory = makeTempDir();
+    const directory = makeTemporaryDirectory();
     writeRootPackageJson(directory, {
       typecheck: "tsc --noEmit",
       lint: "eslint .",
@@ -95,7 +96,7 @@ describe("runSmokeValidation", () => {
   });
 
   it("returns fix hint when a step fails", async () => {
-    const directory = makeTempDir();
+    const directory = makeTemporaryDirectory();
     writeRootPackageJson(directory, {
       typecheck: "tsc --noEmit",
       lint: "eslint .",
@@ -119,7 +120,7 @@ describe("runSmokeValidation", () => {
   });
 
   it("retains command output when both streams contain a failure", async () => {
-    const directory = makeTempDir();
+    const directory = makeTemporaryDirectory();
     writeRootPackageJson(directory, { lint: "eslint ." });
 
     const result = await runSmokeValidation(directory, ["lint"], {
@@ -138,7 +139,7 @@ describe("runSmokeValidation", () => {
   });
 
   it("fails when a required script is missing", async () => {
-    const directory = makeTempDir();
+    const directory = makeTemporaryDirectory();
     writeRootPackageJson(directory, { typecheck: "tsc --noEmit" });
 
     const result = await runSmokeValidation(directory, ["typecheck", "build"], {

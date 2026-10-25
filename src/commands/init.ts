@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { basename, dirname, resolve } from "node:path";
-import * as p from "@clack/prompts";
+import * as prompts from "@clack/prompts";
 import type { GlobalCliOptions } from "../cli-options.js";
 import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
 import type { RunBootstrapPhaseOptions } from "../executor/run-bootstrap-phase.js";
@@ -23,17 +23,17 @@ import {
   resolveSmokePlan,
 } from "../resolver/recipe-plan.js";
 import {
-  loadProjectConfigFromFile,
-  type NormalizedProjectConfig,
+  loadProjectConfigurationFromFile,
+  type NormalizedProjectConfiguration,
   type PackageManager,
-} from "../schema/project-config.js";
+} from "../schema/project-configuration.js";
 import type { Command } from "commander";
 import { getGlobalOptions } from "../cli-options.js";
 import {
-  formatVerifyDocsReport,
-  runVerifyDocs,
+  formatDocumentationVersionReport,
+  verifyDocumentationVersions,
   type NpmFetch,
-  type VerifyDocsResult,
+  type DocumentationVerificationResult,
 } from "../validators/verify-docs.js";
 import {
   formatSmokeFailure,
@@ -49,7 +49,7 @@ export type InitPlan = {
       id: string;
       description: string;
       command: string;
-      cwd: string;
+      workingDirectory: string;
     }>;
   };
   phase2: {
@@ -67,45 +67,45 @@ export type InitPlan = {
 export type InitResult =
   | { status: "cancelled" }
   | { status: "validation_error"; message: string }
-  | { status: "blocked"; compatibility: CompatibilityResult; config: NormalizedProjectConfig }
+  | { status: "blocked"; compatibility: CompatibilityResult; config: NormalizedProjectConfiguration }
   | {
       status: "doc_drift_blocked";
-      config: NormalizedProjectConfig;
-      verifyDocs: VerifyDocsResult;
+      config: NormalizedProjectConfiguration;
+      verifyDocs: DocumentationVerificationResult;
     }
   | {
       status: "dry_run";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
-      verifyDocs?: VerifyDocsResult;
+      verifyDocs?: DocumentationVerificationResult;
       warnings: string[];
     }
   | {
       status: "success";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
       completedBootstrapSteps: string[];
       appliedRecipes: string[];
       smoke: SmokeRunResult;
-      verifyDocs?: VerifyDocsResult;
+      verifyDocs?: DocumentationVerificationResult;
     }
   | {
       status: "smoke_failed";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
       completedBootstrapSteps: string[];
       appliedRecipes: string[];
       smoke: Extract<SmokeRunResult, { ok: false }>;
-      verifyDocs?: VerifyDocsResult;
+      verifyDocs?: DocumentationVerificationResult;
     }
   | {
       status: "execution_failed";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
@@ -123,42 +123,43 @@ export type InitOptions = GlobalCliOptions & {
   skipSmoke?: boolean;
   /** Test hook: inject bootstrap execution without network access. */
   bootstrapOptions?: RunBootstrapPhaseOptions;
+  /** Report scaffold and smoke-check progress to the caller. */
   onProgress?: RunBootstrapPhaseOptions["onProgress"];
   /** Test hook: supply package manager version-check results. */
   packageManagerAvailability?: PackageManagerAvailability;
 };
 
-type StagedProjectConfig = {
+type StagedProjectConfiguration = {
   path: string;
   contents: string;
 };
 
-function stageProjectConfigForBootstrap(
-  configPath: string | undefined,
+function stageProjectConfigurationForBootstrap(
+  configurationPath: string | undefined,
   targetDirectory: string,
-): StagedProjectConfig | undefined {
-  if (!configPath) {
+): StagedProjectConfiguration | undefined {
+  if (!configurationPath) {
     return undefined;
   }
 
-  const absoluteConfigPath = resolve(configPath);
+  const absoluteConfigurationPath = resolve(configurationPath);
   if (
-    basename(absoluteConfigPath).toLowerCase() !== "project.json" ||
-    dirname(absoluteConfigPath) !== targetDirectory ||
-    !existsSync(absoluteConfigPath)
+    basename(absoluteConfigurationPath).toLowerCase() !== "project.json" ||
+    dirname(absoluteConfigurationPath) !== targetDirectory ||
+    !existsSync(absoluteConfigurationPath)
   ) {
     return undefined;
   }
 
   const staged = {
-    path: absoluteConfigPath,
-    contents: readFileSync(absoluteConfigPath, "utf8"),
+    path: absoluteConfigurationPath,
+    contents: readFileSync(absoluteConfigurationPath, "utf8"),
   };
-  unlinkSync(absoluteConfigPath);
+  unlinkSync(absoluteConfigurationPath);
   return staged;
 }
 
-function restoreStagedProjectConfig(staged: StagedProjectConfig | undefined): void {
+function restoreStagedProjectConfiguration(staged: StagedProjectConfiguration | undefined): void {
   if (staged && !existsSync(staged.path)) {
     writeFileSync(staged.path, staged.contents, "utf8");
   }
@@ -168,18 +169,18 @@ function isAgentMode(options: InitOptions): boolean {
   return Boolean(options.config);
 }
 
-async function loadConfig(
+async function loadConfiguration(
   options: InitOptions,
   packageManagerAvailability: PackageManagerAvailability,
 ): Promise<
-  | { ok: true; config: NormalizedProjectConfig }
+  | { ok: true; configuration: NormalizedProjectConfiguration }
   | { ok: false; message: string }
   | { ok: false; cancelled: true }
 > {
   if (options.config) {
     try {
-      const config = loadProjectConfigFromFile(options.config);
-      return { ok: true, config };
+      const configuration = loadProjectConfigurationFromFile(options.config);
+      return { ok: true, configuration };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to parse project.json";
@@ -199,7 +200,7 @@ async function loadConfig(
     return { ok: false, cancelled: true };
   }
 
-  return { ok: true, config: wizard.config };
+  return { ok: true, configuration: wizard.configuration };
 }
 
 function unavailableManagerMessage(
@@ -217,34 +218,35 @@ function unavailableManagerMessage(
 
 async function confirmWarnings(
   compatibility: CompatibilityResult,
-  skipConfirm: boolean,
+  skipConfirmation: boolean,
 ): Promise<boolean> {
-  if (compatibility.warns.length === 0 || skipConfirm) {
+  if (compatibility.warns.length === 0 || skipConfirmation) {
     return true;
   }
 
   console.warn(formatCompatibilityResult(compatibility));
 
-  const proceed = await p.confirm({
+  const proceed = await prompts.confirm({
     message: "Compatibility warnings found — continue anyway?",
     initialValue: false,
   });
 
-  if (p.isCancel(proceed) || !proceed) {
-    p.cancel("Init cancelled due to compatibility warnings.");
+  if (prompts.isCancel(proceed) || !proceed) {
+    prompts.cancel("Init cancelled due to compatibility warnings.");
     return false;
   }
 
   return true;
 }
 
+/** Describe bootstrap, recipe, and validation work before executing a scaffold. */
 export function buildInitPlan(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   directory: string,
   agentMode: boolean,
 ): InitPlan {
-  const bootstrap = resolveBootstrapPlan(config, directory);
-  const recipes = resolveRecipePlan(config);
+  const bootstrap = resolveBootstrapPlan(configuration, directory);
+  const recipes = resolveRecipePlan(configuration);
 
   return {
     phase1: {
@@ -252,7 +254,7 @@ export function buildInitPlan(
         id: step.id,
         description: step.description,
         command: formatBootstrapCommand(step),
-        cwd: step.cwd,
+        workingDirectory: step.workingDirectory,
       })),
     },
     phase2: {
@@ -263,15 +265,16 @@ export function buildInitPlan(
       })),
     },
     phase3: {
-      smoke: resolveSmokePlan(config, agentMode),
+      smoke: resolveSmokePlan(configuration, agentMode),
     },
   };
 }
 
+/** Validate scaffold input and run the planned project creation phases. */
 export async function runInit(options: InitOptions): Promise<InitResult> {
   const packageManagerAvailability =
     options.packageManagerAvailability ?? (await detectPackageManagers());
-  const loaded = await loadConfig(options, packageManagerAvailability);
+  const loaded = await loadConfiguration(options, packageManagerAvailability);
   if (!loaded.ok) {
     if ("cancelled" in loaded && loaded.cancelled) {
       return { status: "cancelled" };
@@ -279,34 +282,34 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { status: "validation_error", message: "message" in loaded ? loaded.message : "Invalid config" };
   }
 
-  const config = loaded.config;
-  const unavailableManager = !packageManagerAvailability[config.packageManager];
+  const configuration = loaded.configuration;
+  const unavailableManager = !packageManagerAvailability[configuration.packageManager];
   const managerWarning = unavailableManager
-    ? unavailableManagerMessage(config.packageManager, packageManagerAvailability)
+    ? unavailableManagerMessage(configuration.packageManager, packageManagerAvailability)
     : undefined;
   if (managerWarning && !options.dryRun) {
     return { status: "validation_error", message: managerWarning };
   }
-  const directory = resolve(options.directory ?? config.name);
+  const directory = resolve(options.directory ?? configuration.name);
   const agentMode = isAgentMode(options);
 
-  const compatibility = resolveCompatibility(config, {
+  const compatibility = resolveCompatibility(configuration, {
     mode: agentMode ? "agent" : "human",
   });
 
   if (!compatibility.ok) {
-    return { status: "blocked", compatibility, config };
+    return { status: "blocked", compatibility, config: configuration };
   }
 
-  let verifyDocs: VerifyDocsResult | undefined;
+  let verifyDocs: DocumentationVerificationResult | undefined;
   if (options.verifyDocs) {
-    verifyDocs = await runVerifyDocs(config, {
+    verifyDocs = await verifyDocumentationVersions(configuration, {
       agentMode,
       npmFetch: options.npmFetch,
     });
 
     if (!verifyDocs.ok) {
-      return { status: "doc_drift_blocked", config, verifyDocs };
+      return { status: "doc_drift_blocked", config: configuration, verifyDocs };
     }
   }
 
@@ -317,12 +320,12 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     }
   }
 
-  const plan = buildInitPlan(config, directory, agentMode);
+  const plan = buildInitPlan(configuration, directory, agentMode);
 
   if (options.dryRun) {
     return {
       status: "dry_run",
-      config,
+      config: configuration,
       compatibility,
       plan,
       verifyDocs,
@@ -330,11 +333,11 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     };
   }
 
-  const stagedConfig = stageProjectConfigForBootstrap(options.config, directory);
+  const stagedConfiguration = stageProjectConfigurationForBootstrap(options.config, directory);
   let execution;
   try {
     execution = await runBootstrapPhase(
-      config,
+      configuration,
       directory,
       {
         ...options.bootstrapOptions,
@@ -342,13 +345,13 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
       },
     );
   } finally {
-    restoreStagedProjectConfig(stagedConfig);
+    restoreStagedProjectConfiguration(stagedConfiguration);
   }
 
   if (!execution.ok) {
     return {
       status: "execution_failed",
-      config,
+      config: configuration,
       compatibility,
       plan,
       directory,
@@ -361,7 +364,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     const skippedSteps = plan.phase3.smoke as SmokeStep[];
     return {
       status: "success",
-      config,
+      config: configuration,
       compatibility,
       plan,
       directory,
@@ -373,7 +376,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   }
 
   const smoke = await runSmokeValidation(directory, plan.phase3.smoke as SmokeStep[], {
-    packageManager: config.packageManager,
+    packageManager: configuration.packageManager,
     runner: options.smokeRunner,
     onStepStart: (step) =>
       options.onProgress?.({
@@ -392,7 +395,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
   if (!smoke.ok) {
     return {
       status: "smoke_failed",
-      config,
+      config: configuration,
       compatibility,
       plan,
       directory,
@@ -405,7 +408,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
 
   return {
     status: "success",
-    config,
+    config: configuration,
     compatibility,
     plan,
     directory,
@@ -423,7 +426,7 @@ function printHumanPlan(result: Extract<InitResult, { plan: InitPlan }>): void {
   for (const step of result.plan.phase1.bootstrap) {
     console.log(`  • ${step.description}`);
     console.log(`    ${step.command}`);
-    console.log(`    cwd: ${step.cwd}`);
+    console.log(`    working directory: ${step.workingDirectory}`);
   }
 
   console.log("\nPhase 2 — Recipes");
@@ -433,6 +436,51 @@ function printHumanPlan(result: Extract<InitResult, { plan: InitPlan }>): void {
 
   console.log("\nPhase 3 — Smoke");
   console.log(`  • ${result.plan.phase3.smoke.join(" → ")}`);
+}
+
+function printDryRun(result: Extract<InitResult, { status: "dry_run" }>): void {
+  if (result.verifyDocs) {
+    console.log(formatDocumentationVersionReport(result.verifyDocs));
+    console.log("");
+  }
+  printHumanPlan(result);
+  if (result.compatibility.warns.length > 0) {
+    console.log("\nWarnings:");
+    console.log(formatCompatibilityResult(result.compatibility));
+  }
+  if (result.warnings.length > 0) {
+    console.log("\nPackage manager warnings:");
+    for (const warning of result.warnings) {
+      console.log(`  ${warning}`);
+    }
+  }
+  console.log("\nDry run complete — no files were written.");
+}
+
+function printCompletedProject(
+  result: Extract<InitResult, { status: "success" }>,
+  pendingRecipes: InitPlan["phase2"]["recipes"],
+): void {
+  if (result.verifyDocs) {
+    console.log(formatDocumentationVersionReport(result.verifyDocs));
+    console.log("");
+  }
+  prompts.log.success("CAPTAIN init complete (Phase 1 + Phase 2 recipes).");
+  console.log("\nCompleted bootstrap steps:");
+  for (const stepId of result.completedBootstrapSteps) {
+    console.log(`  • ${stepId}`);
+  }
+  console.log("\nApplied recipes:");
+  for (const recipeId of result.appliedRecipes) {
+    console.log(`  • ${recipeId}`);
+  }
+  if (pendingRecipes.length > 0) {
+    console.log("\nPending recipes:");
+    for (const step of pendingRecipes) {
+      console.log(`  • [${step.phase}] ${step.description}`);
+    }
+  }
+  console.log(`\nSmoke complete: ${result.smoke.completedSteps.join(" → ")}`);
 }
 
 function handleInitResult(result: InitResult, json: boolean): never {
@@ -476,7 +524,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
       console.log(JSON.stringify(payload, null, 2));
     } else {
       console.error("Doc version pre-flight failed:\n");
-      console.error(formatVerifyDocsReport(result.verifyDocs));
+      console.error(formatDocumentationVersionReport(result.verifyDocs));
     }
     process.exit(1);
   }
@@ -494,22 +542,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
     if (json) {
       console.log(JSON.stringify(payload, null, 2));
     } else {
-      if (result.verifyDocs) {
-        console.log(formatVerifyDocsReport(result.verifyDocs));
-        console.log("");
-      }
-      printHumanPlan(result);
-      if (result.compatibility.warns.length > 0) {
-        console.log("\nWarnings:");
-        console.log(formatCompatibilityResult(result.compatibility));
-      }
-      if (result.warnings.length > 0) {
-        console.log("\nPackage manager warnings:");
-        for (const warning of result.warnings) {
-          console.log(`  ${warning}`);
-        }
-      }
-      console.log("\nDry run complete — no files were written.");
+      printDryRun(result);
     }
     process.exit(0);
   }
@@ -549,27 +582,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
     if (json) {
       console.log(JSON.stringify(payload, null, 2));
     } else {
-      if (result.verifyDocs) {
-        console.log(formatVerifyDocsReport(result.verifyDocs));
-        console.log("");
-      }
-      p.log.success("CAPTAIN init complete (Phase 1 + Phase 2 recipes).");
-      console.log("\nCompleted bootstrap steps:");
-      for (const stepId of result.completedBootstrapSteps) {
-        console.log(`  • ${stepId}`);
-      }
-      console.log("\nApplied recipes:");
-      for (const recipeId of result.appliedRecipes) {
-        console.log(`  • ${recipeId}`);
-      }
-      const pending = payload.pendingRecipes;
-      if (pending.length > 0) {
-        console.log("\nPending recipes:");
-        for (const step of pending) {
-          console.log(`  • [${step.phase}] ${step.description}`);
-        }
-      }
-      console.log(`\nSmoke complete: ${result.smoke.completedSteps.join(" → ")}`);
+      printCompletedProject(result, payload.pendingRecipes);
     }
     process.exit(0);
   }
@@ -609,6 +622,7 @@ function handleInitResult(result: InitResult, json: boolean): never {
   process.exit(1);
 }
 
+/** Register project creation as the CLI's default command. */
 export function registerInitCommand(program: Command): void {
   program
     .command("init", { isDefault: true })
@@ -623,10 +637,10 @@ export function registerInitCommand(program: Command): void {
         onProgress: !globals.json
           ? (event) => {
               if (event.status === "start") {
-                p.log.step(event.description);
+                prompts.log.step(event.description);
                 return;
               }
-              p.log.success(event.description);
+              prompts.log.success(event.description);
             }
           : undefined,
       });

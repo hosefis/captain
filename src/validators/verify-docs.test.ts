@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 import {
   classifyDrift,
-  formatVerifyDocsReport,
-  resolvePackagesForConfig,
-  runVerifyDocs,
-  type DocVersionsManifest,
+  formatDocumentationVersionReport,
+  resolvePackagesForConfiguration,
+  verifyDocumentationVersions,
+  type DocumentationVersionsManifest,
   type NpmFetch,
 } from "./verify-docs.js";
 
-const tierAWebConfig: NormalizedProjectConfig = {
+const tierAWebConfiguration: NormalizedProjectConfiguration = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",
@@ -17,6 +17,7 @@ const tierAWebConfig: NormalizedProjectConfig = {
   apps: ["web"],
   backend: "rest",
   convexExample: false,
+  enforceCodeStandards: false,
   auth: "clerk",
   i18n: { web: "gt-next" },
   ui: { web: "shadcn-base-ui" },
@@ -25,7 +26,7 @@ const tierAWebConfig: NormalizedProjectConfig = {
   stacks: { hasWeb: true, hasMobile: false },
 };
 
-const testManifest: DocVersionsManifest = {
+const testManifest: DocumentationVersionsManifest = {
   version: 1,
   validatedAt: "2026-07-01",
   packages: {
@@ -47,9 +48,9 @@ function mockNpmFetch(versions: Record<string, string>): NpmFetch {
   };
 }
 
-describe("resolvePackagesForConfig", () => {
+describe("resolvePackagesForConfiguration", () => {
   it("resolves Tier A web packages", () => {
-    expect(resolvePackagesForConfig(tierAWebConfig)).toEqual([
+    expect(resolvePackagesForConfiguration(tierAWebConfiguration)).toEqual([
       "@clerk/nextjs",
       "create-next-app",
       "gt-next",
@@ -59,8 +60,8 @@ describe("resolvePackagesForConfig", () => {
   });
 
   it("includes expo bootstrap and mobile adapters for monorepo mobile", () => {
-    const packages = resolvePackagesForConfig({
-      ...tierAWebConfig,
+    const packages = resolvePackagesForConfiguration({
+      ...tierAWebConfiguration,
       topology: "monorepo",
       apps: ["web", "mobile"],
       i18n: { web: "gt-next", mobile: "gt-react-native" },
@@ -78,8 +79,8 @@ describe("resolvePackagesForConfig", () => {
   });
 
   it("includes the Convex SDK only for Convex projects", () => {
-    expect(resolvePackagesForConfig(tierAWebConfig)).not.toContain("convex");
-    expect(resolvePackagesForConfig({ ...tierAWebConfig, backend: "convex" })).toContain("convex");
+    expect(resolvePackagesForConfiguration(tierAWebConfiguration)).not.toContain("convex");
+    expect(resolvePackagesForConfiguration({ ...tierAWebConfiguration, backend: "convex" })).toContain("convex");
   });
 });
 
@@ -92,9 +93,9 @@ describe("classifyDrift", () => {
   });
 });
 
-describe("runVerifyDocs", () => {
+describe("verifyDocumentationVersions", () => {
   it("passes when npm latest matches bundled baseline", async () => {
-    const result = await runVerifyDocs(tierAWebConfig, {
+    const result = await verifyDocumentationVersions(tierAWebConfiguration, {
       agentMode: true,
       manifest: testManifest,
       npmFetch: mockNpmFetch({
@@ -112,7 +113,7 @@ describe("runVerifyDocs", () => {
   });
 
   it("blocks agent mode on major drift", async () => {
-    const result = await runVerifyDocs(tierAWebConfig, {
+    const result = await verifyDocumentationVersions(tierAWebConfiguration, {
       agentMode: true,
       manifest: testManifest,
       npmFetch: mockNpmFetch({
@@ -129,7 +130,7 @@ describe("runVerifyDocs", () => {
   });
 
   it("warns but does not block human mode on major drift", async () => {
-    const result = await runVerifyDocs(tierAWebConfig, {
+    const result = await verifyDocumentationVersions(tierAWebConfiguration, {
       agentMode: false,
       manifest: testManifest,
       npmFetch: mockNpmFetch({
@@ -147,7 +148,7 @@ describe("runVerifyDocs", () => {
   });
 
   it("blocks agent mode when npm fetch fails", async () => {
-    const result = await runVerifyDocs(tierAWebConfig, {
+    const result = await verifyDocumentationVersions(tierAWebConfiguration, {
       agentMode: true,
       manifest: testManifest,
       npmFetch: async () => ({ ok: false, error: "offline" }),
@@ -158,9 +159,9 @@ describe("runVerifyDocs", () => {
   });
 });
 
-describe("formatVerifyDocsReport", () => {
+describe("formatDocumentationVersionReport", () => {
   it("includes package lines and docs url", async () => {
-    const result = await runVerifyDocs(tierAWebConfig, {
+    const result = await verifyDocumentationVersions(tierAWebConfiguration, {
       agentMode: false,
       manifest: testManifest,
       npmFetch: mockNpmFetch({
@@ -172,16 +173,16 @@ describe("formatVerifyDocsReport", () => {
       }),
     });
 
-    const report = formatVerifyDocsReport(result);
+    const report = formatDocumentationVersionReport(result);
     expect(report).toContain("create-next-app");
     expect(report).toContain("https://example.com/next");
   });
 });
 
-describe("loadDocVersionsManifest", () => {
+describe("loadDocumentationVersionsManifest", () => {
   it("loads bundled doc-versions.json", async () => {
-    const { loadDocVersionsManifest } = await import("./verify-docs.js");
-    const manifest = loadDocVersionsManifest();
+    const { loadDocumentationVersionsManifest } = await import("./verify-docs.js");
+    const manifest = loadDocumentationVersionsManifest();
     expect(manifest.version).toBe(1);
     expect(manifest.packages["create-next-app"]?.validated).toBeTruthy();
   });

@@ -1,11 +1,12 @@
 import type { PropsWithChildren } from "react";
 import { Text, View } from "react-native";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexProvider as ConvexClientProvider, ConvexReactClient } from "convex/react";
 
 const deploymentUrl = process.env.EXPO_PUBLIC_CONVEX_URL;
 const convex = deploymentUrl ? new ConvexReactClient(deploymentUrl) : null;
 
-export function CaptainConvexProvider({ children }: PropsWithChildren) {
+/** Connects the application to its Convex deployment. */
+export function ConvexProvider({ children }: PropsWithChildren) {
   if (!convex) {
     return (
       <View style={{ flex: 1, padding: 24, justifyContent: "center" }}>
@@ -14,5 +15,5 @@ export function CaptainConvexProvider({ children }: PropsWithChildren) {
       </View>
     );
   }
-  return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+  return <ConvexClientProvider client={convex}>{children}</ConvexClientProvider>;
 }

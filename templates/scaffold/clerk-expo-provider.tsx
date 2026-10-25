@@ -3,7 +3,8 @@ import { tokenCache } from "@clerk/expo/token-cache";
 import type { PropsWithChildren } from "react";
 import { Text, View } from "react-native";
 
-export function CaptainAuthProvider({ children }: PropsWithChildren) {
+/** Provides Clerk authentication to the application. */
+export function AuthenticationProvider({ children }: PropsWithChildren) {
   const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
   if (!publishableKey) {
     return (

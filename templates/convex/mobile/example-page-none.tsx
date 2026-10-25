@@ -4,6 +4,7 @@ import { Button, ScrollView, Switch, Text, TextInput, View } from "react-native"
 import { useMutation, useQuery } from "convex/react";
 import { api } from "{convexApiImport}";
 
+/** Displays the live Convex task list and its editing controls. */
 export default function ExamplePage() {
   const tasks = useQuery(api.tasks.list);
   const add = useMutation(api.tasks.add);

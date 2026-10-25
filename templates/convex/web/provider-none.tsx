@@ -1,12 +1,13 @@
 "use client";
 
 import type { PropsWithChildren } from "react";
-import { ConvexProvider, ConvexReactClient } from "convex/react";
+import { ConvexProvider as ConvexClientProvider, ConvexReactClient } from "convex/react";
 
 const deploymentUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
 const convex = deploymentUrl ? new ConvexReactClient(deploymentUrl) : null;
 
-export function CaptainConvexProvider({ children }: PropsWithChildren) {
+/** Connects the application to its Convex deployment. */
+export function ConvexProvider({ children }: PropsWithChildren) {
   if (!convex) {
     return (
       <main style={{ padding: 24 }}>
@@ -15,5 +16,5 @@ export function CaptainConvexProvider({ children }: PropsWithChildren) {
       </main>
     );
   }
-  return <ConvexProvider client={convex}>{children}</ConvexProvider>;
+  return <ConvexClientProvider client={convex}>{children}</ConvexClientProvider>;
 }

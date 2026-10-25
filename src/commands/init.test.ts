@@ -4,11 +4,11 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildInitPlan, runInit } from "./init.js";
 
-const fixturesDir = join(import.meta.dirname, "../../fixtures");
+const fixturesDirectory = join(import.meta.dirname, "../../fixtures");
 const allAvailable = { pnpm: true, npm: true, bun: true };
 const pnpmUnavailable = { pnpm: false, npm: true, bun: false };
 
-function makeTempDir(label: string): string {
+function makeTemporaryDirectory(label: string): string {
   const directory = join(
     tmpdir(),
     `captain-init-${label}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -19,10 +19,10 @@ function makeTempDir(label: string): string {
 
 describe("runInit", () => {
   it("stops before creating a target when the configured manager is unavailable", async () => {
-    const directory = join(makeTempDir("missing-parent"), "new-project");
+    const directory = join(makeTemporaryDirectory("missing-parent"), "new-project");
     const result = await runInit({
       directory,
-      config: join(fixturesDir, "project-web.json"),
+      config: join(fixturesDirectory, "project-web.json"),
       packageManagerAvailability: pnpmUnavailable,
     });
 
@@ -36,26 +36,26 @@ describe("runInit", () => {
   });
 
   it("leaves an existing in-target project.json untouched when manager is unavailable", async () => {
-    const directory = makeTempDir("unavailable-in-target");
-    const configPath = join(directory, "project.json");
-    const contents = readFileSync(join(fixturesDir, "project-web.json"), "utf8");
-    writeFileSync(configPath, contents);
+    const directory = makeTemporaryDirectory("unavailable-in-target");
+    const configurationPath = join(directory, "project.json");
+    const contents = readFileSync(join(fixturesDirectory, "project-web.json"), "utf8");
+    writeFileSync(configurationPath, contents);
 
     const result = await runInit({
       directory,
-      config: configPath,
+      config: configurationPath,
       packageManagerAvailability: pnpmUnavailable,
     });
 
     expect(result.status).toBe("validation_error");
-    expect(readFileSync(configPath, "utf8")).toBe(contents);
+    expect(readFileSync(configurationPath, "utf8")).toBe(contents);
   });
 
   it("allows a dry run and warns about an unavailable configured manager", async () => {
-    const directory = join(makeTempDir("dry-run-parent"), "new-project");
+    const directory = join(makeTemporaryDirectory("dry-run-parent"), "new-project");
     const result = await runInit({
       directory,
-      config: join(fixturesDir, "project-web.json"),
+      config: join(fixturesDirectory, "project-web.json"),
       dryRun: true,
       packageManagerAvailability: pnpmUnavailable,
     });
@@ -71,11 +71,12 @@ describe("runInit", () => {
   it("returns dry-run plan for Tier A web config", async () => {
     const result = await runInit({
       directory: "./my-app",
-      config: join(fixturesDir, "project-web.json"),
+      config: join(fixturesDirectory, "project-web.json"),
       yes: true,
       dryRun: true,
       json: false,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
     });
 
     expect(result.status).toBe("dry_run");
@@ -94,16 +95,17 @@ describe("runInit", () => {
 
   it("uses the configured project name when no target directory is provided", async () => {
     const result = await runInit({
-      config: join(fixturesDir, "project-web.json"),
+      config: join(fixturesDirectory, "project-web.json"),
       yes: true,
       dryRun: true,
       json: false,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
     });
 
     expect(result.status).toBe("dry_run");
     if (result.status === "dry_run") {
-      expect(result.plan.phase1.bootstrap[0]?.cwd).toBe(
+      expect(result.plan.phase1.bootstrap[0]?.workingDirectory).toBe(
         join(process.cwd(), "acme-web"),
       );
     }
@@ -112,11 +114,12 @@ describe("runInit", () => {
   it("returns validation error for invalid config file", async () => {
     const result = await runInit({
       directory: ".",
-      config: join(fixturesDir, "project-invalid.json"),
+      config: join(fixturesDirectory, "project-invalid.json"),
       yes: true,
       dryRun: true,
       json: false,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
     });
 
     expect(result.status).toBe("validation_error");
@@ -125,11 +128,12 @@ describe("runInit", () => {
   it("includes verify-docs report on dry-run when enabled", async () => {
     const result = await runInit({
       directory: "./my-app",
-      config: join(fixturesDir, "project-web.json"),
+      config: join(fixturesDirectory, "project-web.json"),
       yes: true,
       dryRun: true,
       json: false,
       verifyDocs: true,
+      packageManagerAvailability: allAvailable,
       npmFetch: async (packageName) => ({
         ok: true,
         version:
@@ -155,11 +159,12 @@ describe("runInit", () => {
   it("blocks agent init on major doc drift", async () => {
     const result = await runInit({
       directory: "./my-app",
-      config: join(fixturesDir, "project-web.json"),
+      config: join(fixturesDirectory, "project-web.json"),
       yes: true,
       dryRun: true,
       json: false,
       verifyDocs: true,
+      packageManagerAvailability: allAvailable,
       npmFetch: async (packageName) => ({
         ok: true,
         version: packageName === "create-next-app" ? "16.0.0" : "1.0.0",
@@ -179,8 +184,8 @@ describe("runInit", () => {
 
   it("returns successful completed smoke details", async () => {
     const result = await runInit({
-      directory: makeTempDir("success"),
-      config: join(fixturesDir, "project-web.json"),
+      directory: makeTemporaryDirectory("success"),
+      config: join(fixturesDirectory, "project-web.json"),
       yes: true,
       dryRun: false,
       json: true,
@@ -204,15 +209,15 @@ describe("runInit", () => {
   });
 
   it("bootstraps when project.json is inside the target directory", async () => {
-    const directory = makeTempDir("in-target-config");
-    const configPath = join(directory, "project.json");
-    const originalConfig = readFileSync(join(fixturesDir, "project-web.json"), "utf8");
-    writeFileSync(configPath, originalConfig);
+    const directory = makeTemporaryDirectory("in-target-config");
+    const configurationPath = join(directory, "project.json");
+    const originalConfiguration = readFileSync(join(fixturesDirectory, "project-web.json"), "utf8");
+    writeFileSync(configurationPath, originalConfiguration);
 
-    let configWasStaged = false;
+    let configurationWasStaged = false;
     const result = await runInit({
       directory,
-      config: configPath,
+      config: configurationPath,
       yes: true,
       dryRun: false,
       json: true,
@@ -221,7 +226,7 @@ describe("runInit", () => {
       bootstrapOptions: {
         bootstrapRunner: async (step) => {
           if (step.id === "bootstrap-web") {
-            configWasStaged = !existsSync(configPath);
+            configurationWasStaged = !existsSync(configurationPath);
           }
           return { exitCode: 0, stdout: "", stderr: "" };
         },
@@ -231,19 +236,19 @@ describe("runInit", () => {
     });
 
     expect(result.status).toBe("success");
-    expect(configWasStaged).toBe(true);
-    expect(existsSync(configPath)).toBe(true);
+    expect(configurationWasStaged).toBe(true);
+    expect(readFileSync(configurationPath, "utf8")).toBe(originalConfiguration);
   });
 
   it("restores an in-target project.json when bootstrap fails", async () => {
-    const directory = makeTempDir("restore-config");
-    const configPath = join(directory, "project.json");
-    const originalConfig = readFileSync(join(fixturesDir, "project-web.json"), "utf8");
-    writeFileSync(configPath, originalConfig);
+    const directory = makeTemporaryDirectory("restore-config");
+    const configurationPath = join(directory, "project.json");
+    const originalConfiguration = readFileSync(join(fixturesDirectory, "project-web.json"), "utf8");
+    writeFileSync(configurationPath, originalConfiguration);
 
     const result = await runInit({
       directory,
-      config: configPath,
+      config: configurationPath,
       yes: true,
       dryRun: false,
       json: true,
@@ -262,13 +267,13 @@ describe("runInit", () => {
     if (result.status === "execution_failed") {
       expect(result.message).toContain("scaffolder failed");
     }
-    expect(readFileSync(configPath, "utf8")).toBe(originalConfig);
+    expect(readFileSync(configurationPath, "utf8")).toBe(originalConfiguration);
   });
 
   it("returns the failed smoke step and completed predecessors", async () => {
     const result = await runInit({
-      directory: makeTempDir("smoke-failure"),
-      config: join(fixturesDir, "project-web.json"),
+      directory: makeTemporaryDirectory("smoke-failure"),
+      config: join(fixturesDirectory, "project-web.json"),
       yes: true,
       dryRun: false,
       json: true,
@@ -304,6 +309,7 @@ describe("buildInitPlan", () => {
         apps: ["web"],
         backend: "rest",
         convexExample: false,
+        enforceCodeStandards: false,
         auth: "clerk",
         i18n: { web: "gt-next" },
         ui: { web: "shadcn-base-ui" },

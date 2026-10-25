@@ -1,39 +1,41 @@
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
+/** Planned generation step and its execution phase. */
 export type RecipeStep = {
   id: string;
   phase: "workspace" | "module" | "adapter" | "config" | "install";
   description: string;
 };
 
-export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[] {
+/** Orders generation steps for the selected project integrations and guidance. */
+export function resolveRecipePlan(configuration: NormalizedProjectConfiguration): RecipeStep[] {
   const steps: RecipeStep[] = [
     {
       id: "project-structure",
       phase: "workspace",
       description:
-        config.topology === "monorepo"
+        configuration.topology === "monorepo"
           ? "Configure Turborepo workspace and shared packages"
           : "Configure framework-native src directories",
     },
     {
       id: "context-md",
       phase: "config",
-      description: "Emit CONTEXT.md stub for agent/human onboarding",
+      description: "Write CONTEXT.md for developer and agent onboarding",
+    },
+    {
+      id: "agent-guidance",
+      phase: "config",
+      description: "Preserve framework guidance and synchronize AGENTS.md and CLAUDE.md",
     },
     {
       id: "env-example",
       phase: "config",
       description: "Emit .env.example with selected integration placeholders",
     },
-    {
-      id: "project-json",
-      phase: "config",
-      description: "Write project.json with resolved CAPTAIN config",
-    },
   ];
 
-  if (config.backend === "rest") {
+  if (configuration.backend === "rest") {
     steps.push({
       id: "backend-rest",
       phase: "adapter",
@@ -41,24 +43,24 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     });
   }
 
-  if (config.auth !== "none") {
+  if (configuration.auth !== "none") {
     steps.push({
       id: "module-authorization",
       phase: "module",
       description: "Authorization module (authorize → Allow | Redirect | Deny)",
     });
     steps.push({
-      id: `auth-${config.auth}`,
+      id: `auth-${configuration.auth}`,
       phase: "adapter",
-      description: `Auth adapter: ${config.auth}`,
+      description: `Auth adapter: ${configuration.auth}`,
     });
   }
 
-  if (config.i18n.web) {
+  if (configuration.i18n.web) {
     steps.push({
-      id: `i18n-web-${config.i18n.web}`,
+      id: `i18n-web-${configuration.i18n.web}`,
       phase: "adapter",
-      description: `Web i18n adapter: ${config.i18n.web}`,
+      description: `Web i18n adapter: ${configuration.i18n.web}`,
     });
     steps.push({
       id: "i18n-enforcement",
@@ -67,11 +69,11 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     });
   }
 
-  if (config.i18n.mobile && config.i18n.mobile !== "none") {
+  if (configuration.i18n.mobile && configuration.i18n.mobile !== "none") {
     steps.push({
-      id: `i18n-mobile-${config.i18n.mobile}`,
+      id: `i18n-mobile-${configuration.i18n.mobile}`,
       phase: "adapter",
-      description: `Mobile i18n adapter: ${config.i18n.mobile}`,
+      description: `Mobile i18n adapter: ${configuration.i18n.mobile}`,
     });
     steps.push({
       id: "expo-localization",
@@ -80,23 +82,23 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     });
   }
 
-  if (config.ui.web) {
+  if (configuration.ui.web) {
     steps.push({
-      id: `ui-web-${config.ui.web}`,
+      id: `ui-web-${configuration.ui.web}`,
       phase: "adapter",
-      description: `Web UI adapter: ${config.ui.web}`,
+      description: `Web UI adapter: ${configuration.ui.web}`,
     });
   }
 
-  if (config.ui.mobile) {
+  if (configuration.ui.mobile) {
     steps.push({
-      id: `ui-mobile-${config.ui.mobile}`,
+      id: `ui-mobile-${configuration.ui.mobile}`,
       phase: "adapter",
-      description: `Mobile UI adapter: ${config.ui.mobile}`,
+      description: `Mobile UI adapter: ${configuration.ui.mobile}`,
     });
   }
 
-  if (config.backend === "convex") {
+  if (configuration.backend === "convex") {
     steps.push({
       id: "backend-convex",
       phase: "adapter",
@@ -104,10 +106,36 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
     });
   }
 
+  if (configuration.enforceCodeStandards) {
+    steps.push({
+      id: "code-standards",
+      phase: "config",
+      description: "Copy standalone standards checker and extend framework and workspace lint commands",
+    });
+  }
+  steps.push({
+    id: "starter-documentation",
+    phase: "install",
+    description: "Document recognized editable starter exports after dependency installation",
+  });
+  if (configuration.stacks.hasMobile) {
+    steps.push({
+      id: "expo-starter-ref",
+      phase: "install",
+      description: "Align Expo starter tab refs with React Native",
+    });
+    steps.push({
+      id: "expo-starter-lint",
+      phase: "install",
+      description: "Preserve framework ESLint configuration and Expo starter hydration compatibility",
+    });
+  }
+
   return steps;
 }
 
-export function resolveSmokePlan(_config: NormalizedProjectConfig, agentMode: boolean): string[] {
+/** Selects validation commands for interactive or agent-driven scaffolding. */
+export function resolveSmokePlan(_configuration: NormalizedProjectConfiguration, agentMode: boolean): string[] {
   const steps = ["typecheck", "lint"];
   if (agentMode) {
     steps.push("build");

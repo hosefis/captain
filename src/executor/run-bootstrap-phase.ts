@@ -1,8 +1,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type ts from "typescript";
 import { resolveBootstrapPlan } from "../resolver/bootstrap.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
-import { applyConfigEmit } from "./config-emit.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
+import { emitProjectGuidance } from "./project-guidance.js";
 import { applyRecipes } from "./apply-recipes.js";
 import {
   runBootstrapPlan,
@@ -11,7 +12,11 @@ import {
 } from "./bootstrap-run.js";
 import { applyProjectStructure } from "./project-structure.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
+import { documentStarterSource, findStarterSourceFiles } from "./starter-documentation.js";
+import { applyExpoStarterLintCompatibility } from "./expo-lint-compatibility.js";
+import { applyExpoStarterRefCompatibility } from "./expo-starter-ref-compatibility.js";
 
+/** Outcome of framework scaffolding, integration generation, and dependency installation. */
 export type BootstrapPhaseResult =
   | {
       ok: true;
@@ -25,15 +30,20 @@ export type BootstrapPhaseResult =
       bootstrap?: BootstrapRunResult;
     };
 
+/** Progress reporting and execution overrides used during scaffold bootstrap. */
 export type RunBootstrapPhaseOptions = {
+  /** Reports the start and completion of a scaffold step. */
   onProgress?: (event: {
     status: "start" | "complete";
     id: string;
     description: string;
   }) => void;
+  /** Executes scaffold commands with an optional caller-supplied runner. */
   bootstrapRunner?: BootstrapRunner;
   /** Simulate create-next-app output when using a mock runner (standalone topologies). */
   simulateBootstrapOutput?: boolean;
+  /** Supplies an explicit compiler for simulated starters without dependency installation. */
+  starterCompiler?: typeof ts;
 };
 
 function appBootstrapScripts(kind: "web" | "mobile"): Record<string, string> {
@@ -76,7 +86,7 @@ function simulateMobileBootstrap(targetDirectory: string): void {
 
 function simulateMonorepoBootstrap(
   targetDirectory: string,
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
 ): void {
   writeFileSync(
     join(targetDirectory, "package.json"),
@@ -88,42 +98,43 @@ function simulateMonorepoBootstrap(
     "utf-8",
   );
 
-  if (config.stacks.hasWeb) {
+  if (configuration.stacks.hasWeb) {
     mkdirSync(join(targetDirectory, "apps", "web"), { recursive: true });
     writeAppBootstrap(join(targetDirectory, "apps", "web"), "web");
   }
 
-  if (config.stacks.hasMobile) {
+  if (configuration.stacks.hasMobile) {
     mkdirSync(join(targetDirectory, "apps", "mobile"), { recursive: true });
     writeAppBootstrap(join(targetDirectory, "apps", "mobile"), "mobile");
   }
 }
 
 function simulateBootstrapOutput(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   targetDirectory: string,
 ): void {
-  if (config.topology === "web") {
+  if (configuration.topology === "web") {
     simulateWebBootstrap(targetDirectory);
     return;
   }
 
-  if (config.topology === "mobile") {
+  if (configuration.topology === "mobile") {
     simulateMobileBootstrap(targetDirectory);
     return;
   }
 
-  simulateMonorepoBootstrap(targetDirectory, config);
+  simulateMonorepoBootstrap(targetDirectory, configuration);
 }
 
+/** Scaffolds frameworks, applies project integrations, and installs dependencies. */
 export async function runBootstrapPhase(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   targetDirectory: string,
   options: RunBootstrapPhaseOptions = {},
 ): Promise<BootstrapPhaseResult> {
   mkdirSync(targetDirectory, { recursive: true });
 
-  const steps = resolveBootstrapPlan(config, targetDirectory);
+  const steps = resolveBootstrapPlan(configuration, targetDirectory);
   const bootstrapResult = await runBootstrapPlan(steps, {
     runner: options.bootstrapRunner,
     onStepStart: (step) =>
@@ -151,24 +162,25 @@ export async function runBootstrapPhase(
   }
 
   if (options.simulateBootstrapOutput) {
-    simulateBootstrapOutput(config, targetDirectory);
+    simulateBootstrapOutput(configuration, targetDirectory);
   }
+  const starterSourceFiles = findStarterSourceFiles(targetDirectory);
 
   try {
     options.onProgress?.({
       status: "start",
       id: "project-structure",
       description:
-        config.topology === "monorepo"
+        configuration.topology === "monorepo"
           ? "Configure Turborepo workspace"
           : "Configure standalone source layout",
     });
-    applyProjectStructure(config, targetDirectory);
+    applyProjectStructure(configuration, targetDirectory);
     options.onProgress?.({
       status: "complete",
       id: "project-structure",
       description:
-        config.topology === "monorepo"
+        configuration.topology === "monorepo"
           ? "Configured Turborepo workspace"
           : "Configured standalone source layout",
     });
@@ -181,20 +193,20 @@ export async function runBootstrapPhase(
     options.onProgress?.({
       status: "start",
       id: "config",
-      description: "Write CAPTAIN configuration",
+      description: "Write project documentation and environment examples",
     });
-    applyConfigEmit(config, targetDirectory);
+    emitProjectGuidance(configuration, targetDirectory);
     options.onProgress?.({
       status: "complete",
       id: "config",
-      description: "Wrote CAPTAIN configuration",
+      description: "Wrote project documentation and environment examples",
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Config emit failed";
     return { ok: false, phase: "config", message };
   }
 
-  const recipesResult = applyRecipes(config, targetDirectory, {
+  const recipesResult = applyRecipes(configuration, targetDirectory, {
     onStepStart: (step) =>
       options.onProgress?.({
         status: "start",
@@ -216,15 +228,15 @@ export async function runBootstrapPhase(
     };
   }
 
-  const install = resolvePackageManagerDriver(config.packageManager).install;
+  const install = resolvePackageManagerDriver(configuration.packageManager).install;
   const installResult = await runBootstrapPlan(
     [
       {
         id: "install-root",
-        description: `Install ${config.packageManager} dependencies`,
+        description: `Install ${configuration.packageManager} dependencies`,
         command: install.command,
-        args: install.args,
-        cwd: targetDirectory,
+        commandArguments: install.commandArguments,
+        workingDirectory: targetDirectory,
       },
     ],
     {
@@ -253,6 +265,36 @@ export async function runBootstrapPhase(
     };
   }
 
+  try {
+    options.onProgress?.({ status: "start", id: "starter-documentation", description: "Document recognized editable framework starter exports" });
+    documentStarterSource(targetDirectory, options.starterCompiler, starterSourceFiles);
+    options.onProgress?.({ status: "complete", id: "starter-documentation", description: "Prepared editable framework starter documentation" });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Starter documentation failed";
+    return { ok: false, phase: "recipes", message: `Starter documentation failed: ${message}` };
+  }
+
+  if (configuration.stacks.hasMobile) {
+    const mobileDirectory = configuration.topology === "monorepo" ? join(targetDirectory, "apps/mobile") : targetDirectory;
+    try {
+      options.onProgress?.({ status: "start", id: "expo-starter-ref", description: "Align Expo starter tab refs with React Native" });
+      applyExpoStarterRefCompatibility(mobileDirectory, starterSourceFiles, options.starterCompiler);
+      options.onProgress?.({ status: "complete", id: "expo-starter-ref", description: "Aligned Expo starter tab refs with React Native" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Expo starter ref compatibility failed";
+      return { ok: false, phase: "recipes", message: `Expo starter ref compatibility failed: ${message}` };
+    }
+
+    try {
+      options.onProgress?.({ status: "start", id: "expo-starter-lint", description: "Preserve Expo starter lint compatibility" });
+      applyExpoStarterLintCompatibility(mobileDirectory, options.starterCompiler);
+      options.onProgress?.({ status: "complete", id: "expo-starter-lint", description: "Preserved Expo starter lint compatibility" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Expo starter lint compatibility failed";
+      return { ok: false, phase: "recipes", message: `Expo starter lint compatibility failed: ${message}` };
+    }
+  }
+
   return {
     ok: true,
     completedBootstrapSteps: [
@@ -263,8 +305,10 @@ export async function runBootstrapPhase(
       "project-structure",
       "context-md",
       "env-example",
-      "project-json",
+      "agent-guidance",
       ...recipesResult.appliedRecipes,
+      "starter-documentation",
+      ...(configuration.stacks.hasMobile ? ["expo-starter-ref", "expo-starter-lint"] : []),
     ],
   };
 }

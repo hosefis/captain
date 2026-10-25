@@ -1,14 +1,14 @@
-import type { NormalizedProjectConfig, PackageManager } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration, PackageManager } from "../schema/project-configuration.js";
 
 export type BootstrapStep = {
   id: string;
   description: string;
   command: string;
-  args: string[];
-  cwd: string;
+  commandArguments: string[];
+  workingDirectory: string;
 };
 
-function dlxCommand(packageManager: PackageManager): string {
+function packageExecutorCommand(packageManager: PackageManager): string {
   if (packageManager === "npm") {
     return "npx";
   }
@@ -18,17 +18,17 @@ function dlxCommand(packageManager: PackageManager): string {
   return "pnpm dlx";
 }
 
-function nextAppArgs(config: NormalizedProjectConfig, targetDir: string): string[] {
+function nextAppArguments(configuration: NormalizedProjectConfiguration, targetDirectory: string): string[] {
   const useFlag =
-    config.packageManager === "pnpm"
+    configuration.packageManager === "pnpm"
       ? "--use-pnpm"
-      : config.packageManager === "bun"
+      : configuration.packageManager === "bun"
         ? "--use-bun"
         : "--use-npm";
 
   return [
     "create-next-app@latest",
-    targetDir,
+    targetDirectory,
     "--typescript",
     "--tailwind",
     "--eslint",
@@ -39,15 +39,15 @@ function nextAppArgs(config: NormalizedProjectConfig, targetDir: string): string
   ];
 }
 
-function expoAppArgs(targetDir: string): string[] {
-  return ["create-expo-app@latest", targetDir, "--template", "default", "--yes"];
+function expoAppArguments(targetDirectory: string): string[] {
+  return ["create-expo-app@latest", targetDirectory, "--template", "default", "--yes"];
 }
 
-function turboArgs(config: NormalizedProjectConfig): string[] {
-  const pmFlag =
-    config.packageManager === "pnpm"
+function turboArguments(configuration: NormalizedProjectConfiguration): string[] {
+  const packageManagerFlag =
+    configuration.packageManager === "pnpm"
       ? "pnpm"
-      : config.packageManager === "bun"
+      : configuration.packageManager === "bun"
         ? "bun"
         : "npm";
 
@@ -58,7 +58,7 @@ function turboArgs(config: NormalizedProjectConfig): string[] {
     "basic",
     "--skip-install",
     "--package-manager",
-    pmFlag,
+    packageManagerFlag,
   ];
 }
 
@@ -66,47 +66,48 @@ function spawnStep(
   id: string,
   description: string,
   packageManager: PackageManager,
-  args: string[],
-  cwd: string,
+  commandArguments: string[],
+  workingDirectory: string,
 ): BootstrapStep {
-  const dlx = dlxCommand(packageManager);
-  const [command, ...dlxPrefix] = dlx.split(" ");
+  const packageExecutor = packageExecutorCommand(packageManager);
+  const [command, ...executorPrefix] = packageExecutor.split(" ");
 
   return {
     id,
     description,
-    command: command ?? dlx,
-    args: [...dlxPrefix, ...args],
-    cwd,
+    command: command ?? packageExecutor,
+    commandArguments: [...executorPrefix, ...commandArguments],
+    workingDirectory,
   };
 }
 
+/** Plan framework starter commands for the requested apps and topology. */
 export function resolveBootstrapPlan(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   targetDirectory: string,
 ): BootstrapStep[] {
   const steps: BootstrapStep[] = [];
 
-  if (config.topology === "web") {
+  if (configuration.topology === "web") {
     steps.push(
       spawnStep(
         "bootstrap-web",
         "Scaffold Next.js app (TypeScript, App Router, Tailwind, ESLint)",
-        config.packageManager,
-        nextAppArgs(config, "."),
+        configuration.packageManager,
+        nextAppArguments(configuration, "."),
         targetDirectory,
       ),
     );
     return steps;
   }
 
-  if (config.topology === "mobile") {
+  if (configuration.topology === "mobile") {
     steps.push(
       spawnStep(
         "bootstrap-mobile",
         "Scaffold Expo Router app (default template)",
-        config.packageManager,
-        expoAppArgs("."),
+        configuration.packageManager,
+        expoAppArguments("."),
         targetDirectory,
       ),
     );
@@ -117,31 +118,31 @@ export function resolveBootstrapPlan(
     spawnStep(
       "bootstrap-monorepo",
       "Scaffold Turborepo monorepo base",
-      config.packageManager,
-      turboArgs(config),
+      configuration.packageManager,
+      turboArguments(configuration),
       targetDirectory,
     ),
   );
 
-  if (config.stacks.hasWeb) {
+  if (configuration.stacks.hasWeb) {
     steps.push(
       spawnStep(
         "bootstrap-apps-web",
         "Add Next.js app at apps/web",
-        config.packageManager,
-        nextAppArgs(config, "apps/web"),
+        configuration.packageManager,
+        nextAppArguments(configuration, "apps/web"),
         targetDirectory,
       ),
     );
   }
 
-  if (config.stacks.hasMobile) {
+  if (configuration.stacks.hasMobile) {
     steps.push(
       spawnStep(
         "bootstrap-apps-mobile",
         "Add Expo app at apps/mobile",
-        config.packageManager,
-        expoAppArgs("apps/mobile"),
+        configuration.packageManager,
+        expoAppArguments("apps/mobile"),
         targetDirectory,
       ),
     );
@@ -150,11 +151,12 @@ export function resolveBootstrapPlan(
   return steps;
 }
 
+/** Render a bootstrap command or deferred slot description for the plan display. */
 export function formatBootstrapCommand(step: BootstrapStep): string {
   if (step.command === "(slot)") {
     return step.description;
   }
 
-  const parts = [step.command, ...step.args].filter(Boolean);
+  const parts = [step.command, ...step.commandArguments].filter(Boolean);
   return parts.join(" ");
 }

@@ -1,7 +1,8 @@
 import { Stack } from "expo-router";
-import { CaptainConvexProvider } from "@/integrations/convex/captain-convex-provider";
+import { ConvexProvider } from "@/integrations/convex/convex-provider";
 import "../global.css";
 
+/** Wraps application routes with the selected providers and root layout. */
 export default function RootLayout() {
-  return <CaptainConvexProvider><Stack /></CaptainConvexProvider>;
+  return <ConvexProvider><Stack /></ConvexProvider>;
 }

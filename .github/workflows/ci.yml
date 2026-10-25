@@ -20,6 +20,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm test
       - run: pnpm test:release
+      - run: pnpm test:standards
       - run: pnpm test:matrix
       - run: pnpm build
 

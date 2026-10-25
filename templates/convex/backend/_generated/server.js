@@ -1,5 +1,5 @@
 /* eslint-disable */
-// Preseeded by CAPTAIN. `convex dev` replaces this with Convex-generated code.
+// `convex dev` replaces this file with generated bindings.
 export {
   queryGeneric as query,
   internalQueryGeneric as internalQuery,
