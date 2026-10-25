@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "{name}",
 };
 
+/** Provide the application stack around routed content. */
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="{defaultLocale}">

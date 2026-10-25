@@ -5,6 +5,7 @@ import type {
   AuthorizationClaims,
 } from "./types.js";
 
+/** Evaluate an action against the selected authorization policy. */
 export function authorize(
   adapter: AuthorizationAdapter,
   action: AuthorizationAction,

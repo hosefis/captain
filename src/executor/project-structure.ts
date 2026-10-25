@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { copyTemplateTree } from "../generators/template.js";
-import { templatesDir } from "../lib/paths.js";
+import { templatesDirectory } from "../lib/paths.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
 
@@ -12,10 +12,8 @@ const PNPM_ONLY_BUILT_DEPENDENCIES = [
   "sharp",
   "unrs-resolver",
 ];
-// Next's ESLint toolchain cannot load TypeScript 7 from the Turborepo starter.
-const MONOREPO_TYPESCRIPT_VERSION = "5.9.3";
-// Expo's Worklets plugin must resolve Babel 7 from the monorepo root.
-const MONOREPO_BABEL_VERSION = "7.29.7";
+const ESLINT_COMPATIBLE_TYPESCRIPT_VERSION = "5.9.3";
+const EXPO_COMPATIBLE_BABEL_VERSION = "7.29.7";
 
 function workspaceScripts(): Record<string, string> {
   return {
@@ -41,13 +39,13 @@ function pnpmWorkspaceYaml(): string {
   ].join("\n");
 }
 
-function ensurePnpmWorkspace(targetDir: string): void {
-  const workspacePath = join(targetDir, "pnpm-workspace.yaml");
+function ensurePnpmWorkspace(targetDirectory: string): void {
+  const workspacePath = join(targetDirectory, "pnpm-workspace.yaml");
   writeFileSync(workspacePath, pnpmWorkspaceYaml(), "utf-8");
 }
 
-function ensureStandalonePnpmConfig(targetDir: string): void {
-  const workspacePath = join(targetDir, "pnpm-workspace.yaml");
+function ensureStandalonePnpmConfiguration(targetDirectory: string): void {
+  const workspacePath = join(targetDirectory, "pnpm-workspace.yaml");
   if (!existsSync(workspacePath)) {
     writeFileSync(workspacePath, 'packages:\n  - "."\n', "utf-8");
     return;
@@ -65,7 +63,7 @@ function ensureStandalonePnpmConfig(targetDir: string): void {
   );
 }
 
-function writeTurboJson(targetDir: string): void {
+function writeTurboJson(targetDirectory: string): void {
   const turbo = {
     $schema: "https://turbo.build/schema.json",
     tasks: {
@@ -79,28 +77,28 @@ function writeTurboJson(targetDir: string): void {
     },
   };
   writeFileSync(
-    join(targetDir, "turbo.json"),
+    join(targetDirectory, "turbo.json"),
     `${JSON.stringify(turbo, null, 2)}\n`,
     "utf-8",
   );
 }
 
 function patchMonorepoRoot(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfig,
 ): void {
-  const packagePath = join(targetDir, "package.json");
+  const packagePath = join(targetDirectory, "package.json");
   const current = existsSync(packagePath)
     ? (JSON.parse(readFileSync(packagePath, "utf-8")) as Record<string, unknown>)
     : {};
-  const driver = resolvePackageManagerDriver(config.packageManager);
+  const driver = resolvePackageManagerDriver(configuration.packageManager);
 
   writeFileSync(
     packagePath,
     `${JSON.stringify(
       {
         ...current,
-        name: config.name,
+        name: configuration.name,
         private: true,
         packageManager: driver.manifestId,
         workspaces: ["apps/*", "packages/*"],
@@ -111,8 +109,8 @@ function patchMonorepoRoot(
         devDependencies: {
           ...((current.devDependencies as Record<string, string> | undefined) ?? {}),
           turbo: "^2.5.0",
-          typescript: MONOREPO_TYPESCRIPT_VERSION,
-          ...(config.apps.includes("mobile") ? { "@babel/core": MONOREPO_BABEL_VERSION } : {}),
+          typescript: ESLINT_COMPATIBLE_TYPESCRIPT_VERSION,
+          ...(configuration.apps.includes("mobile") ? { "@babel/core": EXPO_COMPATIBLE_BABEL_VERSION } : {}),
         },
       },
       null,
@@ -122,69 +120,70 @@ function patchMonorepoRoot(
   );
 
   if (driver.emitsPnpmWorkspace) {
-    ensurePnpmWorkspace(targetDir);
+    ensurePnpmWorkspace(targetDirectory);
   }
-  writeTurboJson(targetDir);
+  writeTurboJson(targetDirectory);
 }
 
 function emitPackageSkeletons(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfig,
 ): void {
-  const scopeName = config.scope.replace(/^@/, "");
+  const scopeName = configuration.scope.replace(/^@/, "");
   const workspaceRange =
-    resolvePackageManagerDriver(config.packageManager).workspaceRange;
-  const vars = {
-    scope: config.scope,
+    resolvePackageManagerDriver(configuration.packageManager).workspaceRange;
+  const variables = {
+    scope: configuration.scope,
     scopeName,
-    corePackage: `${config.scope}/core`,
+    corePackage: `${configuration.scope}/core`,
     workspaceRange,
   };
 
   const packages = ["core", "adapters-next", "adapters-expo"] as const;
   for (const packageId of packages) {
-    const target = join(targetDir, "packages", packageId);
+    const target = join(targetDirectory, "packages", packageId);
     if (existsSync(target)) {
       continue;
     }
     copyTemplateTree(
-      join(templatesDir(), "packages", packageId),
+      join(templatesDirectory(), "packages", packageId),
       target,
       packageId === "core"
-        ? vars
+        ? variables
         : {
-            ...vars,
-            adapterPackage: `${config.scope}/${packageId}`,
+            ...variables,
+            adapterPackage: `${configuration.scope}/${packageId}`,
           },
     );
   }
 }
 
-function pinMonorepoTypescript(targetDir: string): void {
+/** Keep starter compilers compatible with Next's ESLint toolchain. */
+function pinMonorepoTypescript(targetDirectory: string): void {
   for (const workspace of ["apps", "packages"]) {
-    const workspaceDir = join(targetDir, workspace);
-    if (!existsSync(workspaceDir)) continue;
+    const workspaceDirectory = join(targetDirectory, workspace);
+    if (!existsSync(workspaceDirectory)) continue;
 
-    for (const entry of readdirSync(workspaceDir, { withFileTypes: true })) {
+    for (const entry of readdirSync(workspaceDirectory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
-      const packagePath = join(workspaceDir, entry.name, "package.json");
+      const packagePath = join(workspaceDirectory, entry.name, "package.json");
       if (!existsSync(packagePath)) continue;
       const manifest = JSON.parse(readFileSync(packagePath, "utf-8")) as {
         devDependencies?: Record<string, string>;
       };
       const current = manifest.devDependencies?.typescript;
       if (typeof current !== "string" || !/^[~^]?7\./.test(current)) continue;
-      manifest.devDependencies!.typescript = MONOREPO_TYPESCRIPT_VERSION;
+      manifest.devDependencies!.typescript = ESLINT_COMPATIBLE_TYPESCRIPT_VERSION;
       writeFileSync(packagePath, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
     }
   }
 }
 
-function patchMonorepoEslintConfig(targetDir: string): void {
-  const configPath = join(targetDir, "packages", "eslint-config", "base.js");
-  if (!existsSync(configPath)) return;
+function patchMonorepoEslintConfiguration(targetDirectory: string): void {
+  const configurationPath = join(targetDirectory, "packages", "eslint-config", "base.js");
+  if (!existsSync(configurationPath)) return;
 
-  const source = readFileSync(configPath, "utf-8");
+  const source = readFileSync(configurationPath, "utf-8");
   const preset = 'presets: ["@babel/preset-typescript"]';
   if (!source.includes(preset)) return;
 
@@ -193,15 +192,15 @@ function patchMonorepoEslintConfig(targetDir: string): void {
     'presets: [createRequire(import.meta.url).resolve("@babel/preset-typescript")]',
   );
   writeFileSync(
-    configPath,
+    configurationPath,
     `import { createRequire } from "node:module";\n${patched}`,
     "utf-8",
   );
 }
 
 function createStandaloneDirectories(
-  targetDir: string,
-  config: NormalizedProjectConfig,
+  targetDirectory: string,
+  configuration: NormalizedProjectConfig,
 ): void {
   for (const directory of [
     "src/app",
@@ -210,10 +209,10 @@ function createStandaloneDirectories(
     "src/lib",
     "src/integrations",
   ]) {
-    mkdirSync(join(targetDir, directory), { recursive: true });
+    mkdirSync(join(targetDirectory, directory), { recursive: true });
   }
 
-  const packagePath = join(targetDir, "package.json");
+  const packagePath = join(targetDirectory, "package.json");
   const current = JSON.parse(readFileSync(packagePath, "utf-8")) as {
     scripts?: Record<string, string>;
     [key: string]: unknown;
@@ -221,7 +220,7 @@ function createStandaloneDirectories(
   const scripts = {
     ...(current.scripts ?? {}),
     typecheck: "tsc --noEmit",
-    ...(config.topology === "mobile"
+    ...(configuration.topology === "mobile"
       ? { build: "expo export", lint: current.scripts?.lint ?? "expo lint" }
       : {}),
   };
@@ -230,9 +229,9 @@ function createStandaloneDirectories(
     `${JSON.stringify(
       {
         ...current,
-        name: config.name,
+        name: configuration.name,
         packageManager:
-          resolvePackageManagerDriver(config.packageManager).manifestId,
+          resolvePackageManagerDriver(configuration.packageManager).manifestId,
         scripts,
       },
       null,
@@ -241,32 +240,33 @@ function createStandaloneDirectories(
     "utf-8",
   );
 
-  if (config.packageManager === "pnpm") {
-    ensureStandalonePnpmConfig(targetDir);
+  if (configuration.packageManager === "pnpm") {
+    ensureStandalonePnpmConfiguration(targetDirectory);
   }
 }
 
+/** Configure framework workspaces and create the selected project directory structure. */
 export function applyProjectStructure(
-  config: NormalizedProjectConfig,
-  targetDir: string,
+  configuration: NormalizedProjectConfig,
+  targetDirectory: string,
 ): void {
-  if (config.topology !== "monorepo") {
-    createStandaloneDirectories(targetDir, config);
+  if (configuration.topology !== "monorepo") {
+    createStandaloneDirectories(targetDirectory, configuration);
     return;
   }
 
-  patchMonorepoRoot(targetDir, config);
-  patchMonorepoEslintConfig(targetDir);
-  emitPackageSkeletons(targetDir, config);
-  pinMonorepoTypescript(targetDir);
-  for (const app of config.apps) {
-    if (config.packageManager === "pnpm") {
-      const nestedWorkspacePath = join(targetDir, "apps", app, "pnpm-workspace.yaml");
+  patchMonorepoRoot(targetDirectory, configuration);
+  patchMonorepoEslintConfiguration(targetDirectory);
+  emitPackageSkeletons(targetDirectory, configuration);
+  pinMonorepoTypescript(targetDirectory);
+  for (const app of configuration.apps) {
+    if (configuration.packageManager === "pnpm") {
+      const nestedWorkspacePath = join(targetDirectory, "apps", app, "pnpm-workspace.yaml");
       if (existsSync(nestedWorkspacePath)) {
         unlinkSync(nestedWorkspacePath);
       }
     }
-    const packagePath = join(targetDir, "apps", app, "package.json");
+    const packagePath = join(targetDirectory, "apps", app, "package.json");
     if (!existsSync(packagePath)) {
       continue;
     }

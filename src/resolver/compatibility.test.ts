@@ -20,31 +20,31 @@ const webInput = {
 
 describe("project config", () => {
   it("normalizes standalone web", () => {
-    const config = parseProjectConfig(webInput);
-    expect(config.apps).toEqual(["web"]);
-    expect(config.i18n).toEqual({ web: "gt-next" });
+    const configuration = parseProjectConfig(webInput);
+    expect(configuration.apps).toEqual(["web"]);
+    expect(configuration.i18n).toEqual({ web: "gt-next" });
   });
 
   it("normalizes the supported monorepo composition", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfig({
       ...webInput,
       topology: "monorepo",
       runtime: "dev-build",
       i18n: { web: "gt-next", mobile: "gt-react-native" },
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
-    expect(config.apps).toEqual(["web", "mobile"]);
+    expect(configuration.apps).toEqual(["web", "mobile"]);
   });
 
   it("supports Expo Go without mobile i18n", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfig({
       ...webInput,
       topology: "mobile",
       runtime: "expo-go",
       i18n: "none",
       ui: "nativewind",
     });
-    expect(config.i18n.mobile).toBe("none");
+    expect(configuration.i18n.mobile).toBe("none");
   });
 
   it("rejects GT React Native with Expo Go", () => {
@@ -81,7 +81,7 @@ describe("compatibility policy", () => {
   });
 
   it("passes every schema-supported configuration", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfig({
       ...webInput,
       topology: "mobile",
       runtime: "dev-build",
@@ -89,7 +89,7 @@ describe("compatibility policy", () => {
       ui: "nativewind",
     });
     const matrix = loadCompatibilityMatrix();
-    expect(resolveCompatibility(config, { matrix, mode: "human" }).warns).toHaveLength(0);
-    expect(resolveCompatibility(config, { matrix, mode: "agent" }).ok).toBe(true);
+    expect(resolveCompatibility(configuration, { matrix, mode: "human" }).warns).toHaveLength(0);
+    expect(resolveCompatibility(configuration, { matrix, mode: "agent" }).ok).toBe(true);
   });
 });

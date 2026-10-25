@@ -16,16 +16,16 @@ describe("package manager drivers", () => {
     ["bun", "bun", ["install"], "bun.lock", "workspace:*", false, "bun@1.2.5"],
   ] as const)(
     "resolves %s workspace behavior",
-    (id, command, args, lockfile, workspaceRange, emitsPnpmWorkspace, manifestId) => {
+    (id, command, commandArguments, lockfile, workspaceRange, emitsPnpmWorkspace, manifestId) => {
       const driver = resolvePackageManagerDriver(id);
-      expect(driver.install).toEqual({ command, args });
+      expect(driver.install).toEqual({ command, commandArguments });
       expect(driver.lockfile).toBe(lockfile);
       expect(driver.workspaceRange).toBe(workspaceRange);
       expect(driver.emitsPnpmWorkspace).toBe(emitsPnpmWorkspace);
       expect(driver.manifestId).toBe(manifestId);
       expect(driver.runScript("build")).toEqual({
         command,
-        args: ["run", "build"],
+        commandArguments: ["run", "build"],
       });
     },
   );

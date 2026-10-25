@@ -7,8 +7,9 @@ export type PackageJsonPatch = {
   scripts?: Record<string, string>;
 };
 
+/** Merge recipe dependencies and scripts into an existing package manifest. */
 export function mergePackageJson(path: string, patch: PackageJsonPatch): void {
-  const pkg = JSON.parse(readFileSync(path, "utf-8")) as {
+  const manifest = JSON.parse(readFileSync(path, "utf-8")) as {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
     peerDependencies?: Record<string, string>;
@@ -16,20 +17,20 @@ export function mergePackageJson(path: string, patch: PackageJsonPatch): void {
   };
 
   if (patch.dependencies) {
-    pkg.dependencies = { ...pkg.dependencies, ...patch.dependencies };
+    manifest.dependencies = { ...manifest.dependencies, ...patch.dependencies };
   }
   if (patch.devDependencies) {
-    pkg.devDependencies = { ...pkg.devDependencies, ...patch.devDependencies };
+    manifest.devDependencies = { ...manifest.devDependencies, ...patch.devDependencies };
   }
   if (patch.peerDependencies) {
-    pkg.peerDependencies = {
-      ...pkg.peerDependencies,
+    manifest.peerDependencies = {
+      ...manifest.peerDependencies,
       ...patch.peerDependencies,
     };
   }
   if (patch.scripts) {
-    pkg.scripts = { ...pkg.scripts, ...patch.scripts };
+    manifest.scripts = { ...manifest.scripts, ...patch.scripts };
   }
 
-  writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`, "utf-8");
+  writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`, "utf-8");
 }

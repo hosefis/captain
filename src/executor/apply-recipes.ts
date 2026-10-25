@@ -1,12 +1,12 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeRenderedFile } from "../generators/template.js";
-import { templatesDir } from "../lib/paths.js";
+import { templatesDirectory } from "../lib/paths.js";
 import { resolveRecipePlan, type RecipeStep } from "../resolver/recipe-plan.js";
 import type { App, NormalizedProjectConfig } from "../schema/project-config.js";
 import { mergePackageJson } from "./package-json.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
-import { buildRecipeVars, type RecipeVars } from "./recipe-vars.js";
+import { buildRecipeVariables, type RecipeVariables } from "./recipe-vars.js";
 import { testedRange } from "./tested-versions.js";
 
 export type ApplyRecipesResult =
@@ -76,15 +76,15 @@ function mergeAppPackageJson(
 function renderModuleFile(
   templateRelativePath: string,
   targetPath: string,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
-  writeRenderedFile(join(templatesDir(), templateRelativePath), targetPath, vars);
+  writeRenderedFile(join(templatesDirectory(), templateRelativePath), targetPath, vars);
 }
 
 function applyBackendRest(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
   onlyApp?: App,
 ): void {
   const core = coreSourceDir(targetDir, config);
@@ -122,7 +122,7 @@ function applyBackendRest(
 function applyBackendConvex(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
   const monorepo = config.topology === "monorepo";
   const functionsDir = monorepo
@@ -232,7 +232,7 @@ function applyBackendConvex(
 function applyModuleAuthorization(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
   const authDir =
     config.topology === "monorepo"
@@ -248,7 +248,7 @@ function applyModuleAuthorization(
 function applyAuthClerk(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
   onlyApp?: App,
 ): void {
   if (config.stacks.hasWeb && (!onlyApp || onlyApp === "web")) {
@@ -350,7 +350,7 @@ function applyAuthClerk(
 function applyI18nWebGtNext(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
   const integrations = adapterSourceDir(targetDir, config, "adapters-next");
   mkdirSync(join(integrations, "i18n"), { recursive: true });
@@ -380,7 +380,7 @@ function applyI18nWebGtNext(
 function applyI18nMobileGtReactNative(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
   const integrations = adapterSourceDir(targetDir, config, "adapters-expo");
   mkdirSync(join(integrations, "i18n"), { recursive: true });
@@ -401,7 +401,7 @@ function applyI18nMobileGtReactNative(
   });
 }
 
-function applyI18nEnforcement(targetDir: string, config: NormalizedProjectConfig, vars: RecipeVars): void {
+function applyI18nEnforcement(targetDir: string, config: NormalizedProjectConfig, vars: RecipeVariables): void {
   const toolsDir = join(targetDir, "tools", "i18n");
   mkdirSync(toolsDir, { recursive: true });
 
@@ -441,7 +441,7 @@ function applyExpoLocalization(
 function applyUiWebShadcnBaseUi(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
   const integrations = adapterSourceDir(targetDir, config, "adapters-next");
   mkdirSync(join(integrations, "ui"), { recursive: true });
@@ -468,7 +468,7 @@ function applyUiWebShadcnBaseUi(
 function applyUiMobileNativewind(
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
   const integrations = adapterSourceDir(targetDir, config, "adapters-expo");
   mkdirSync(join(integrations, "ui"), { recursive: true });
@@ -544,7 +544,7 @@ function applyRecipeStep(
   step: RecipeStep,
   targetDir: string,
   config: NormalizedProjectConfig,
-  vars: RecipeVars,
+  vars: RecipeVariables,
 ): void {
   switch (step.id) {
     case "backend-rest":
@@ -582,15 +582,18 @@ function applyRecipeStep(
   }
 }
 
+/** Apply selected integration recipes and stop at the first failed step. */
 export function applyRecipes(
   config: NormalizedProjectConfig,
   targetDir: string,
   options: {
+    /** Announce the recipe about to run. */
     onStepStart?: (step: RecipeStep) => void;
+    /** Announce a successfully applied recipe. */
     onStepComplete?: (step: RecipeStep) => void;
   } = {},
 ): ApplyRecipesResult {
-  const vars = buildRecipeVars(config);
+  const vars = buildRecipeVariables(config);
   const steps = resolveRecipePlan(config).filter((step) => !WORKSPACE_CONFIG_STEPS.has(step.id));
   const applied = new Set<string>();
 

@@ -8,7 +8,9 @@ export type HttpRequestOptions = {
 };
 
 export type BackendClient = {
+  /** Send a backend request and decode its response. */
   request<T>(path: string, options?: HttpRequestOptions): Promise<T>;
 };
 
+/** Create a backend client for the current application context. */
 export type BackendClientFactory = () => BackendClient;

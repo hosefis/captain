@@ -6,6 +6,7 @@ export type RecipeStep = {
   description: string;
 };
 
+/** Plan workspace setup and integration recipes for the selected stack. */
 export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[] {
   const steps: RecipeStep[] = [
     {
@@ -102,6 +103,7 @@ export function resolveRecipePlan(config: NormalizedProjectConfig): RecipeStep[]
   return steps;
 }
 
+/** Choose validation steps for human or agent project creation. */
 export function resolveSmokePlan(_config: NormalizedProjectConfig, agentMode: boolean): string[] {
   const steps = ["typecheck", "lint"];
   if (agentMode) {

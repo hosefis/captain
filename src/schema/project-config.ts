@@ -206,6 +206,7 @@ function normalizeUi(config: ProjectConfig, apps: App[]): NormalizedUi {
   };
 }
 
+/** Resolve topology-specific apps and integration selections into one configuration. */
 export function normalizeProjectConfig(config: ProjectConfig): NormalizedProjectConfig {
   const apps = resolveApps(config);
   const i18n = normalizeI18n(config, apps);
@@ -223,10 +224,12 @@ export function normalizeProjectConfig(config: ProjectConfig): NormalizedProject
   };
 }
 
+/** Validate project input and return its normalized configuration. */
 export function parseProjectConfig(input: unknown): NormalizedProjectConfig {
   return normalizeProjectConfig(projectConfigSchema.parse(input));
 }
 
+/** Describe accepted project inputs as a portable JSON Schema. */
 export function projectConfigJsonSchema(): Record<string, unknown> {
   return toJSONSchema(projectConfigSchema, {
     target: "draft-2020-12",
@@ -235,6 +238,7 @@ export function projectConfigJsonSchema(): Record<string, unknown> {
   }) as Record<string, unknown>;
 }
 
+/** Load and validate a project configuration from a JSON file. */
 export function loadProjectConfigFromFile(configPath: string): NormalizedProjectConfig {
   const absolutePath = path.resolve(configPath);
   const raw = readFileSync(absolutePath, "utf-8");

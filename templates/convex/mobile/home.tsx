@@ -1,6 +1,7 @@
 import { Link } from "expo-router";
 import { Text, View } from "react-native";
 
+/** Render project onboarding and the Convex example link. */
 export default function HomePage() {
   return (
     <View style={{ flex: 1, padding: 24, gap: 12 }}>

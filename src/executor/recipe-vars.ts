@@ -1,22 +1,23 @@
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
-export type RecipeVars = Record<string, string>;
+export type RecipeVariables = Record<string, string>;
 
-export function buildRecipeVars(config: NormalizedProjectConfig): RecipeVars {
-  const scopeName = config.scope.replace(/^@/, "");
+/** Resolve project names and stack selections for recipe template substitution. */
+export function buildRecipeVariables(configuration: NormalizedProjectConfig): RecipeVariables {
+  const scopeName = configuration.scope.replace(/^@/, "");
 
   return {
-    scope: config.scope,
+    scope: configuration.scope,
     scopeName,
-    name: config.name,
+    name: configuration.name,
     corePackage:
-      config.topology === "monorepo" ? `${config.scope}/core` : "@/lib",
-    adapterNextPackage: `${config.scope}/adapters-next`,
-    adapterExpoPackage: `${config.scope}/adapters-expo`,
-    adapterDesktopPackage: `${config.scope}/adapters-desktop`,
-    locales: config.locales.join(","),
-    defaultLocale: config.defaultLocale,
-    backend: config.backend,
-    auth: config.auth,
+      configuration.topology === "monorepo" ? `${configuration.scope}/core` : "@/lib",
+    adapterNextPackage: `${configuration.scope}/adapters-next`,
+    adapterExpoPackage: `${configuration.scope}/adapters-expo`,
+    adapterDesktopPackage: `${configuration.scope}/adapters-desktop`,
+    locales: configuration.locales.join(","),
+    defaultLocale: configuration.defaultLocale,
+    backend: configuration.backend,
+    auth: configuration.auth,
   };
 }

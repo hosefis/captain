@@ -27,7 +27,7 @@ const base = {
 
 describe("applyProjectStructure", () => {
   it("keeps standalone projects at the framework root", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfig({
       ...base,
       topology: "web",
       i18n: "gt-next",
@@ -35,7 +35,7 @@ describe("applyProjectStructure", () => {
     });
     const target = directory("web");
 
-    applyProjectStructure(config, target);
+    applyProjectStructure(configuration, target);
 
     expect(existsSync(join(target, "src/app"))).toBe(true);
     expect(existsSync(join(target, "apps"))).toBe(false);
@@ -47,7 +47,7 @@ describe("applyProjectStructure", () => {
   });
 
   it("makes a scaffold-generated pnpm config valid for a standalone root", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfig({
       ...base,
       topology: "web",
       i18n: "gt-next",
@@ -59,7 +59,7 @@ describe("applyProjectStructure", () => {
       "ignoredBuiltDependencies:\n  - sharp\n",
     );
 
-    applyProjectStructure(config, target);
+    applyProjectStructure(configuration, target);
 
     const workspace = readFileSync(
       join(target, "pnpm-workspace.yaml"),
@@ -71,7 +71,7 @@ describe("applyProjectStructure", () => {
   });
 
   it("creates shared packages only for explicit monorepos", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfig({
       ...base,
       topology: "monorepo",
       runtime: "expo-go",
@@ -88,7 +88,7 @@ describe("applyProjectStructure", () => {
     writeFileSync(join(target, "apps/web/package.json"), '{"name":"web","packageManager":"pnpm@11.25.0","scripts":{"build":"next build"}}\n');
     writeFileSync(join(target, "apps/mobile/package.json"), '{"name":"mobile","scripts":{"start":"expo start"}}\n');
 
-    applyProjectStructure(config, target);
+    applyProjectStructure(configuration, target);
 
     expect(existsSync(join(target, "packages/core"))).toBe(true);
     expect(existsSync(join(target, "packages/adapters-next"))).toBe(true);
@@ -109,7 +109,7 @@ describe("applyProjectStructure", () => {
   });
 
   it("resolves the shared Babel preset from its own package for Bun installs", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfig({
       ...base,
       packageManager: "bun",
       topology: "monorepo",
@@ -118,16 +118,16 @@ describe("applyProjectStructure", () => {
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
     const target = directory("bun-eslint");
-    const eslintDir = join(target, "packages/eslint-config");
-    mkdirSync(eslintDir, { recursive: true });
+    const eslintDirectory = join(target, "packages/eslint-config");
+    mkdirSync(eslintDirectory, { recursive: true });
     writeFileSync(
-      join(eslintDir, "base.js"),
+      join(eslintDirectory, "base.js"),
       'export const config = { presets: ["@babel/preset-typescript"] };\n',
     );
 
-    applyProjectStructure(config, target);
+    applyProjectStructure(configuration, target);
 
-    const patched = readFileSync(join(eslintDir, "base.js"), "utf-8");
+    const patched = readFileSync(join(eslintDirectory, "base.js"), "utf-8");
     expect(patched).toContain('createRequire(import.meta.url).resolve("@babel/preset-typescript")');
     expect(patched).toContain('import { createRequire } from "node:module"');
   });

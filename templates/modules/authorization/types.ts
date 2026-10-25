@@ -15,5 +15,6 @@ export type AuthorizationAction = {
 };
 
 export type AuthorizationAdapter = {
+  /** Decide whether the supplied claims permit an action. */
   authorize(action: AuthorizationAction, claims: AuthorizationClaims): AuthDecision;
 };

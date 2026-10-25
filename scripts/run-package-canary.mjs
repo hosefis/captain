@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { execa } from "execa";
 
 const repository = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const [mode, version] = process.argv.slice(2).filter((arg) => arg !== "--");
+const [mode, version] = process.argv.slice(2).filter((argument) => argument !== "--");
 
 if (!["packed", "published", "available"].includes(mode)) {
   throw new Error("Usage: node scripts/run-package-canary.mjs packed|published|available [version]");
@@ -21,15 +21,15 @@ const root = configuredRoot
   : mkdtempSync(join(tmpdir(), `captain-${mode}-canary-`));
 mkdirSync(root, { recursive: true });
 const project = join(root, "generated");
-const config = join(root, "project.json");
+const configuration = join(root, "project.json");
 const log = join(root, "canary.log");
-writeFileSync(config, readFileSync(join(repository, "fixtures", "project-web.json")));
+writeFileSync(configuration, readFileSync(join(repository, "fixtures", "project-web.json")));
 
-async function run(command, args, cwd, allowFailure = false) {
-  const rendered = [command, ...args].join(" ");
+async function run(command, commandArguments, workingDirectory, allowFailure = false) {
+  const rendered = [command, ...commandArguments].join(" ");
   console.log(`$ ${rendered}`);
-  const result = await execa(command, args, {
-    cwd,
+  const result = await execa(command, commandArguments, {
+    cwd: workingDirectory,
     reject: false,
     stdin: "ignore",
     all: true,
@@ -45,8 +45,9 @@ async function run(command, args, cwd, allowFailure = false) {
 }
 
 async function waitForPublishedVersion(packageSpec) {
-  const maxAttempts = 60;
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+  const maximumAttempts = 60;
+  const retryDelayMilliseconds = 10_000;
+  for (let attempt = 1; attempt <= maximumAttempts; attempt++) {
     const { output, exitCode } = await run(
       "npm", ["view", packageSpec, "version", "--json", "--prefer-online"], root, true,
     );
@@ -54,11 +55,11 @@ async function waitForPublishedVersion(packageSpec) {
     if (!/E404|404 Not Found|No match found for version/i.test(output)) {
       throw new Error(`Registry lookup failed for ${packageSpec}. Diagnostics: ${log}`);
     }
-    if (attempt === maxAttempts) {
-      throw new Error(`${packageSpec} was not available after ${maxAttempts} registry checks. Diagnostics: ${log}`);
+    if (attempt === maximumAttempts) {
+      throw new Error(`${packageSpec} was not available after ${maximumAttempts} registry checks. Diagnostics: ${log}`);
     }
-    console.log(`Waiting 10 seconds for ${packageSpec} to reach npm (${attempt}/${maxAttempts})`);
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 10_000));
+    console.log(`Waiting 10 seconds for ${packageSpec} to reach npm (${attempt}/${maximumAttempts})`);
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, retryDelayMilliseconds));
   }
 }
 
@@ -79,8 +80,7 @@ try {
       await waitForPublishedVersion(packageSpec);
     }
 
-    // Run outside the repository so no local dist, templates, or dependencies can satisfy this check.
-    await run("pnpm", ["dlx", packageSpec, project, "--config", config, "--yes", "--json"], root);
+    await run("pnpm", ["dlx", packageSpec, project, "--config", configuration, "--yes", "--json"], root);
 
     const generatedPackage = JSON.parse(readFileSync(join(project, "package.json"), "utf8"));
     if (!existsSync(join(project, "src", "app")) || !existsSync(join(project, "node_modules"))) {

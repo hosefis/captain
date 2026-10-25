@@ -45,6 +45,7 @@ function cancelIfNeeded<T>(value: T | symbol): value is symbol {
   return false;
 }
 
+/** Derive a valid npm scope from a project name. */
 export function deriveScopeFromProjectName(name: string): string {
   return `@${name.trim().toLowerCase()}`;
 }
@@ -95,6 +96,7 @@ function summary(config: NormalizedProjectConfig): string {
   return lines.join("\n");
 }
 
+/** Collect and confirm a supported project configuration interactively. */
 export async function runWizard(
   options: {
     yes?: boolean;

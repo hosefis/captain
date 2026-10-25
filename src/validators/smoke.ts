@@ -7,11 +7,12 @@ import { resolvePackageManagerDriver } from "../executor/package-manager.js";
 
 export type SmokeStep = "typecheck" | "lint" | "build";
 
+/** Execute a project validation command and capture its process result. */
 export type SmokeRunner = (
   step: SmokeStep,
   command: string,
-  args: string[],
-  cwd: string,
+  commandArguments: string[],
+  workingDirectory: string,
 ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
 
 export type SmokeRunResult =
@@ -33,44 +34,47 @@ const FIX_HINTS: Record<SmokeStep, string> = {
     "Fix build errors in the app or workspace packages, then re-run the workspace build script.",
 };
 
+/** Describe the corrective action for a failed project validation step. */
 export function smokeFixHint(step: SmokeStep): string {
   return FIX_HINTS[step];
 }
 
+/** Select project validation steps for the requested execution mode. */
 export function resolveSmokeSteps(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfig,
   agentMode: boolean,
 ): SmokeStep[] {
-  return resolveSmokePlan(config, agentMode) as SmokeStep[];
+  return resolveSmokePlan(configuration, agentMode) as SmokeStep[];
 }
 
+/** Build the selected package manager's project validation command. */
 export function resolveSmokeCommand(
   step: SmokeStep,
   packageManager: PackageManager,
-): { command: string; args: string[] } {
+): { command: string; commandArguments: string[] } {
   return resolvePackageManagerDriver(packageManager).runScript(step);
 }
 
 function readRootScripts(directory: string): Record<string, string> | null {
-  const pkgPath = join(directory, "package.json");
-  if (!existsSync(pkgPath)) {
+  const manifestPath = join(directory, "package.json");
+  if (!existsSync(manifestPath)) {
     return null;
   }
 
-  const pkg = JSON.parse(readFileSync(pkgPath, "utf-8")) as {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as {
     scripts?: Record<string, string>;
   };
-  return pkg.scripts ?? null;
+  return manifest.scripts ?? null;
 }
 
 async function defaultSmokeRunner(
   _step: SmokeStep,
   command: string,
-  args: string[],
-  cwd: string,
+  commandArguments: string[],
+  workingDirectory: string,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  const result = await execa(command, args, {
-    cwd,
+  const result = await execa(command, commandArguments, {
+    cwd: workingDirectory,
     stdio: ["ignore", "pipe", "pipe"],
     reject: false,
   });
@@ -82,13 +86,17 @@ async function defaultSmokeRunner(
   };
 }
 
+/** Run project validation scripts in order and report the first failure with a fix hint. */
 export async function runSmokeValidation(
   directory: string,
   steps: SmokeStep[],
   options: {
     packageManager?: PackageManager;
+    /** Replace process execution for validation commands. */
     runner?: SmokeRunner;
+    /** Announce the validation step about to run. */
     onStepStart?: (step: SmokeStep) => void;
+    /** Announce a successfully completed validation step. */
     onStepComplete?: (step: SmokeStep) => void;
   } = {},
 ): Promise<SmokeRunResult> {
@@ -109,9 +117,9 @@ export async function runSmokeValidation(
       };
     }
 
-    const { command, args } = resolveSmokeCommand(step, packageManager);
+    const { command, commandArguments } = resolveSmokeCommand(step, packageManager);
     options.onStepStart?.(step);
-    const result = await runner(step, command, args, directory);
+    const result = await runner(step, command, commandArguments, directory);
 
     if (result.exitCode !== 0) {
       return {
@@ -131,6 +139,7 @@ export async function runSmokeValidation(
   return { ok: true, steps, completedSteps };
 }
 
+/** Format the failed validation command's diagnostics and suggested next action. */
 export function formatSmokeFailure(
   result: Extract<SmokeRunResult, { ok: false }>,
 ): string {

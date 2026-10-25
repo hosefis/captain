@@ -42,6 +42,7 @@ function Tasks() {
   );
 }
 
+/** Render the signed-in user task example. */
 export default function ExamplePage() {
   return (
     <ScrollView contentContainerStyle={{ padding: 24, gap: 12 }}>

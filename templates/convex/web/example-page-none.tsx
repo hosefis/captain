@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "{convexApiImport}";
 
+/** Render the public Convex task example. */
 export default function ExamplePage() {
   const tasks = useQuery(api.tasks.list);
   const add = useMutation(api.tasks.add);

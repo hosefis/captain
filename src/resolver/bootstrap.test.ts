@@ -5,7 +5,7 @@ import {
 } from "./bootstrap.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
-const webConfig: NormalizedProjectConfig = {
+const webConfiguration: NormalizedProjectConfig = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",
@@ -21,8 +21,8 @@ const webConfig: NormalizedProjectConfig = {
   stacks: { hasWeb: true, hasMobile: false },
 };
 
-const monorepoConfig: NormalizedProjectConfig = {
-  ...webConfig,
+const monorepoConfiguration: NormalizedProjectConfig = {
+  ...webConfiguration,
   name: "acme-platform",
   topology: "monorepo",
   apps: ["web", "mobile"],
@@ -34,7 +34,7 @@ const monorepoConfig: NormalizedProjectConfig = {
 
 describe("resolveBootstrapPlan", () => {
   it("plans create-next-app for web topology", () => {
-    const steps = resolveBootstrapPlan(webConfig, "/tmp/acme-web");
+    const steps = resolveBootstrapPlan(webConfiguration, "/tmp/acme-web");
 
     expect(steps).toHaveLength(1);
     expect(steps[0]?.id).toBe("bootstrap-web");
@@ -44,8 +44,8 @@ describe("resolveBootstrapPlan", () => {
   });
 
   it("plans create-expo-app for mobile topology", () => {
-    const mobileConfig: NormalizedProjectConfig = {
-      ...webConfig,
+    const mobileConfiguration: NormalizedProjectConfig = {
+      ...webConfiguration,
       topology: "mobile",
       apps: ["mobile"],
       runtime: "dev-build",
@@ -54,7 +54,7 @@ describe("resolveBootstrapPlan", () => {
       stacks: { hasWeb: false, hasMobile: true },
     };
 
-    const steps = resolveBootstrapPlan(mobileConfig, "/tmp/acme-mobile");
+    const steps = resolveBootstrapPlan(mobileConfiguration, "/tmp/acme-mobile");
 
     expect(steps).toHaveLength(1);
     expect(steps[0]?.id).toBe("bootstrap-mobile");
@@ -66,7 +66,7 @@ describe("resolveBootstrapPlan", () => {
   });
 
   it("plans turbo plus nested apps for monorepo", () => {
-    const steps = resolveBootstrapPlan(monorepoConfig, "/tmp/acme-platform");
+    const steps = resolveBootstrapPlan(monorepoConfiguration, "/tmp/acme-platform");
 
     expect(steps.map((step) => step.id)).toEqual([
       "bootstrap-monorepo",
@@ -81,12 +81,12 @@ describe("resolveBootstrapPlan", () => {
   });
 
   it("uses npx for npm package manager", () => {
-    const npmConfig: NormalizedProjectConfig = {
-      ...webConfig,
+    const npmConfiguration: NormalizedProjectConfig = {
+      ...webConfiguration,
       packageManager: "npm",
     };
 
-    const steps = resolveBootstrapPlan(npmConfig, "/tmp/acme");
+    const steps = resolveBootstrapPlan(npmConfiguration, "/tmp/acme");
     expect(formatBootstrapCommand(steps[0]!)).toMatch(/^npx create-next-app@latest/);
     expect(formatBootstrapCommand(steps[0]!)).toContain("--use-npm");
   });

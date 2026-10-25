@@ -11,6 +11,7 @@ export type ClerkExpoSessionClaims = {
   roles: string[];
 };
 
+/** Map Clerk session identity and role into Expo authorization claims. */
 export function mapClerkExpoClaims(userId: string, role: string | undefined): ClerkExpoSessionClaims {
   return {
     userId,

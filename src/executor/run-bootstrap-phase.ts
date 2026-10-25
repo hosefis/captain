@@ -26,11 +26,13 @@ export type BootstrapPhaseResult =
     };
 
 export type RunBootstrapPhaseOptions = {
+  /** Report project creation progress to the caller. */
   onProgress?: (event: {
     status: "start" | "complete";
     id: string;
     description: string;
   }) => void;
+  /** Replace process execution while preserving scaffold sequencing. */
   bootstrapRunner?: BootstrapRunner;
   /** Simulate create-next-app output when using a mock runner (standalone topologies). */
   simulateBootstrapOutput?: boolean;
@@ -116,6 +118,7 @@ function simulateBootstrapOutput(
   simulateMonorepoBootstrap(targetDirectory, config);
 }
 
+/** Scaffold framework apps, apply recipes, and install project dependencies. */
 export async function runBootstrapPhase(
   config: NormalizedProjectConfig,
   targetDirectory: string,
@@ -223,8 +226,8 @@ export async function runBootstrapPhase(
         id: "install-root",
         description: `Install ${config.packageManager} dependencies`,
         command: install.command,
-        args: install.args,
-        cwd: targetDirectory,
+        commandArguments: install.commandArguments,
+        workingDirectory: targetDirectory,
       },
     ],
     {

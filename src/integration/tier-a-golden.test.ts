@@ -178,8 +178,8 @@ describe("Tier A golden fixtures (pre-publish matrix)", () => {
 
         const smoke = await runSmokeValidation(directory, smokeSteps, {
           packageManager,
-          runner: async (step, command, args) => {
-            expect({ command, args }).toEqual(
+          runner: async (step, command, commandArguments) => {
+            expect({ command, commandArguments }).toEqual(
               resolvePackageManagerDriver(packageManager).runScript(step),
             );
             return { exitCode: 0, stdout: "", stderr: "" };

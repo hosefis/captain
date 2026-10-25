@@ -15,6 +15,7 @@ export type ClerkSessionClaims = {
   roles: string[];
 };
 
+/** Map Clerk session identity and role into application authorization claims. */
 export function mapClerkClaims(userId: string, role: string | undefined): ClerkSessionClaims {
   return {
     userId,

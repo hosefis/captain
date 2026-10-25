@@ -57,17 +57,18 @@ export type CompatibilityMatrix = {
   recipeBlocks: RecipeBlockRule[];
 };
 
-function findPackageRoot(startDir: string): string {
-  let dir = startDir;
-  while (dir !== path.dirname(dir)) {
-    if (existsSync(path.join(dir, "compatibility.json"))) {
-      return dir;
+function findPackageRoot(startDirectory: string): string {
+  let directory = startDirectory;
+  while (directory !== path.dirname(directory)) {
+    if (existsSync(path.join(directory, "compatibility.json"))) {
+      return directory;
     }
-    dir = path.dirname(dir);
+    directory = path.dirname(directory);
   }
   throw new Error("compatibility.json not found");
 }
 
+/** Load supported stack constraints from the bundled or supplied compatibility matrix. */
 export function loadCompatibilityMatrix(
   matrixPath?: string,
 ): CompatibilityMatrix {
@@ -82,52 +83,52 @@ function issueId(prefix: string, id: string | undefined, fallback: string): stri
   return id ?? `${prefix}:${fallback}`;
 }
 
-function activeStacks(config: NormalizedProjectConfig): StackKind[] {
+function activeStacks(configuration: NormalizedProjectConfig): StackKind[] {
   const stacks: StackKind[] = [];
-  if (config.stacks.hasWeb) {
+  if (configuration.stacks.hasWeb) {
     stacks.push("next");
   }
-  if (config.stacks.hasMobile) {
+  if (configuration.stacks.hasMobile) {
     stacks.push("expo");
   }
   return stacks;
 }
 
 function i18nForStack(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfig,
   stack: StackKind,
 ): string | undefined {
   if (stack === "next") {
-    return config.i18n.web;
+    return configuration.i18n.web;
   }
   if (stack === "expo") {
-    return config.i18n.mobile;
+    return configuration.i18n.mobile;
   }
-  return config.i18n.web;
+  return configuration.i18n.web;
 }
 
 function matchesHardBlock(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfig,
   rule: HardBlockRule,
 ): boolean {
   if (!rule.stack) {
     return false;
   }
 
-  const stacks = activeStacks(config);
+  const stacks = activeStacks(configuration);
   if (!stacks.includes(rule.stack)) {
     return false;
   }
 
-  if (rule.i18n !== undefined && i18nForStack(config, rule.stack) !== rule.i18n) {
+  if (rule.i18n !== undefined && i18nForStack(configuration, rule.stack) !== rule.i18n) {
     return false;
   }
 
-  if (rule.auth !== undefined && config.auth !== rule.auth) {
+  if (rule.auth !== undefined && configuration.auth !== rule.auth) {
     return false;
   }
 
-  if (rule.runtime !== undefined && config.runtime !== rule.runtime) {
+  if (rule.runtime !== undefined && configuration.runtime !== rule.runtime) {
     return false;
   }
 
@@ -135,23 +136,23 @@ function matchesHardBlock(
 }
 
 function matchesSoftWarn(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfig,
   rule: SoftWarnRule,
 ): boolean {
   if (rule.stack) {
-    if (!activeStacks(config).includes(rule.stack)) {
+    if (!activeStacks(configuration).includes(rule.stack)) {
       return false;
     }
 
-    if (rule.i18n !== undefined && i18nForStack(config, rule.stack) !== rule.i18n) {
+    if (rule.i18n !== undefined && i18nForStack(configuration, rule.stack) !== rule.i18n) {
       return false;
     }
 
-    if (rule.auth !== undefined && config.auth !== rule.auth) {
+    if (rule.auth !== undefined && configuration.auth !== rule.auth) {
       return false;
     }
 
-    if (rule.runtime !== undefined && config.runtime !== rule.runtime) {
+    if (rule.runtime !== undefined && configuration.runtime !== rule.runtime) {
       return false;
     }
   }
@@ -164,26 +165,26 @@ function matchesSoftWarn(
 }
 
 function matchesRecipeBlock(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfig,
   rule: RecipeBlockRule,
 ): boolean {
-  if (rule.backend !== undefined && config.backend !== rule.backend) {
+  if (rule.backend !== undefined && configuration.backend !== rule.backend) {
     return false;
   }
 
-  if (rule.auth !== undefined && config.auth !== rule.auth) {
+  if (rule.auth !== undefined && configuration.auth !== rule.auth) {
     return false;
   }
 
   if (rule.i18n !== undefined) {
-    const values = [config.i18n.web, config.i18n.mobile].filter(Boolean);
+    const values = [configuration.i18n.web, configuration.i18n.mobile].filter(Boolean);
     if (!values.includes(rule.i18n as typeof values[number])) {
       return false;
     }
   }
 
   if (rule.ui !== undefined) {
-    const values = [config.ui.web, config.ui.mobile].filter(Boolean);
+    const values = [configuration.ui.web, configuration.ui.mobile].filter(Boolean);
     if (!values.includes(rule.ui as typeof values[number])) {
       return false;
     }
@@ -192,8 +193,9 @@ function matchesRecipeBlock(
   return true;
 }
 
+/** Classify stack constraints as warnings or blocks for human and agent execution. */
 export function resolveCompatibility(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfig,
   options: {
     mode?: CompatibilityMode;
     matrix?: CompatibilityMatrix;
@@ -206,7 +208,7 @@ export function resolveCompatibility(
   const warns: CompatibilityIssue[] = [];
 
   for (const rule of matrix.hardBlocks) {
-    if (matchesHardBlock(config, rule)) {
+    if (matchesHardBlock(configuration, rule)) {
       blocks.push({
         id: issueId("hard", rule.id, rule.message),
         severity: "block",
@@ -216,7 +218,7 @@ export function resolveCompatibility(
   }
 
   for (const rule of matrix.recipeBlocks) {
-    if (matchesRecipeBlock(config, rule)) {
+    if (matchesRecipeBlock(configuration, rule)) {
       blocks.push({
         id: rule.id,
         severity: "block",
@@ -226,7 +228,7 @@ export function resolveCompatibility(
   }
 
   for (const rule of matrix.softWarns) {
-    if (matchesSoftWarn(config, rule)) {
+    if (matchesSoftWarn(configuration, rule)) {
       warns.push({
         id: rule.id,
         severity: "warn",
@@ -253,6 +255,7 @@ export function resolveCompatibility(
   };
 }
 
+/** Format compatibility decisions and corrective hints for terminal output. */
 export function formatCompatibilityResult(result: CompatibilityResult): string {
   const lines: string[] = [];
 

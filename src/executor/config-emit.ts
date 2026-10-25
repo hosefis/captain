@@ -1,7 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { writeRenderedFile } from "../generators/template.js";
-import { templatesDir } from "../lib/paths.js";
+import { templatesDirectory } from "../lib/paths.js";
 import type { NormalizedProjectConfig } from "../schema/project-config.js";
 
 function templateVars(config: NormalizedProjectConfig): Record<string, string> {
@@ -52,17 +52,19 @@ function templateVars(config: NormalizedProjectConfig): Record<string, string> {
   };
 }
 
+/** Write onboarding guidance for the selected project stack. */
 export function emitContextMd(config: NormalizedProjectConfig, targetDir: string): void {
   writeRenderedFile(
-    join(templatesDir(), "CONTEXT.md"),
+    join(templatesDirectory(), "CONTEXT.md"),
     join(targetDir, "CONTEXT.md"),
     templateVars(config),
   );
 }
 
+/** Write environment variable examples for the selected integrations. */
 export function emitEnvExample(config: NormalizedProjectConfig, targetDir: string): void {
   writeRenderedFile(
-    join(templatesDir(), "env.example"),
+    join(templatesDirectory(), "env.example"),
     join(targetDir, ".env.example"),
     templateVars(config),
   );

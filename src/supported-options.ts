@@ -1,5 +1,5 @@
-export type SupportedOption<T extends string> = {
-  value: T;
+export type SupportedOption<Value extends string> = {
+  value: Value;
   label: string;
 };
 
@@ -35,14 +35,16 @@ export const SUPPORTED_OPTIONS = {
   mobileUi: [{ value: "nativewind", label: "NativeWind" }],
 } as const;
 
+/** Extract schema-ready values while retaining each option's literal type. */
 export function optionValues<
-  const T extends readonly SupportedOption<string>[],
->(options: T): { [K in keyof T]: T[K] extends SupportedOption<infer V> ? V : never } {
+  const Options extends readonly SupportedOption<string>[],
+>(options: Options): { [Index in keyof Options]: Options[Index] extends SupportedOption<infer Value> ? Value : never } {
   return options.map((option) => option.value) as {
-    [K in keyof T]: T[K] extends SupportedOption<infer V> ? V : never;
+    [Index in keyof Options]: Options[Index] extends SupportedOption<infer Value> ? Value : never;
   };
 }
 
+/** List mobile translation options supported by the selected Expo runtime. */
 export function compatibleMobileI18n(runtime: "expo-go" | "dev-build") {
   return SUPPORTED_OPTIONS.mobileI18n.filter((option) =>
     runtime === "expo-go"

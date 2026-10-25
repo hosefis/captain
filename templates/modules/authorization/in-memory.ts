@@ -5,6 +5,7 @@ import type {
   AuthorizationClaims,
 } from "./types.js";
 
+/** Create a role-based authorization policy backed by in-memory rules. */
 export function createInMemoryAuthorizationAdapter(
   rules: Array<{
     role: string;
@@ -13,6 +14,7 @@ export function createInMemoryAuthorizationAdapter(
   }>,
 ): AuthorizationAdapter {
   return {
+    /** Allow actions matching a role rule and deny all others. */
     authorize(action: AuthorizationAction, claims: AuthorizationClaims): AuthDecision {
       const allowed = rules.some(
         (rule) =>
