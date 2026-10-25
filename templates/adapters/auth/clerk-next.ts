@@ -2,7 +2,7 @@
  * Clerk auth adapter for Next.js App Router.
  * Wire in middleware.ts and server actions per Next.js data security guide.
  */
-export const clerkAuthenticationConfig = {
+export const clerkAuthenticationConfiguration = {
   publishableKey: process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
   signInUrl: "/sign-in",
   signUpUrl: "/sign-up",

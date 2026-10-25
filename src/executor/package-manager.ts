@@ -1,4 +1,4 @@
-import type { PackageManager } from "../schema/project-config.js";
+import type { PackageManager } from "../schema/project-configuration.js";
 
 export type PackageManagerCommand = {
   command: string;

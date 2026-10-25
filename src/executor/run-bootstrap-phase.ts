@@ -2,8 +2,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type ts from "typescript";
 import { resolveBootstrapPlan } from "../resolver/bootstrap.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
-import { applyConfigEmit } from "./config-emit.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
+import { emitProjectGuidance } from "./project-guidance.js";
 import { applyRecipes } from "./apply-recipes.js";
 import {
   runBootstrapPlan,
@@ -85,7 +85,7 @@ function simulateMobileBootstrap(targetDirectory: string): void {
 
 function simulateMonorepoBootstrap(
   targetDirectory: string,
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
 ): void {
   writeFileSync(
     join(targetDirectory, "package.json"),
@@ -97,43 +97,43 @@ function simulateMonorepoBootstrap(
     "utf-8",
   );
 
-  if (config.stacks.hasWeb) {
+  if (configuration.stacks.hasWeb) {
     mkdirSync(join(targetDirectory, "apps", "web"), { recursive: true });
     writeAppBootstrap(join(targetDirectory, "apps", "web"), "web");
   }
 
-  if (config.stacks.hasMobile) {
+  if (configuration.stacks.hasMobile) {
     mkdirSync(join(targetDirectory, "apps", "mobile"), { recursive: true });
     writeAppBootstrap(join(targetDirectory, "apps", "mobile"), "mobile");
   }
 }
 
 function simulateBootstrapOutput(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   targetDirectory: string,
 ): void {
-  if (config.topology === "web") {
+  if (configuration.topology === "web") {
     simulateWebBootstrap(targetDirectory);
     return;
   }
 
-  if (config.topology === "mobile") {
+  if (configuration.topology === "mobile") {
     simulateMobileBootstrap(targetDirectory);
     return;
   }
 
-  simulateMonorepoBootstrap(targetDirectory, config);
+  simulateMonorepoBootstrap(targetDirectory, configuration);
 }
 
 /** Scaffolds frameworks, applies project integrations, and installs dependencies. */
 export async function runBootstrapPhase(
-  config: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   targetDirectory: string,
   options: RunBootstrapPhaseOptions = {},
 ): Promise<BootstrapPhaseResult> {
   mkdirSync(targetDirectory, { recursive: true });
 
-  const steps = resolveBootstrapPlan(config, targetDirectory);
+  const steps = resolveBootstrapPlan(configuration, targetDirectory);
   const bootstrapResult = await runBootstrapPlan(steps, {
     runner: options.bootstrapRunner,
     onStepStart: (step) =>
@@ -161,7 +161,7 @@ export async function runBootstrapPhase(
   }
 
   if (options.simulateBootstrapOutput) {
-    simulateBootstrapOutput(config, targetDirectory);
+    simulateBootstrapOutput(configuration, targetDirectory);
   }
   const starterSourceFiles = findStarterSourceFiles(targetDirectory);
 
@@ -170,16 +170,16 @@ export async function runBootstrapPhase(
       status: "start",
       id: "project-structure",
       description:
-        config.topology === "monorepo"
+        configuration.topology === "monorepo"
           ? "Configure Turborepo workspace"
           : "Configure standalone source layout",
     });
-    applyProjectStructure(config, targetDirectory);
+    applyProjectStructure(configuration, targetDirectory);
     options.onProgress?.({
       status: "complete",
       id: "project-structure",
       description:
-        config.topology === "monorepo"
+        configuration.topology === "monorepo"
           ? "Configured Turborepo workspace"
           : "Configured standalone source layout",
     });
@@ -194,7 +194,7 @@ export async function runBootstrapPhase(
       id: "config",
       description: "Write project documentation and environment examples",
     });
-    applyConfigEmit(config, targetDirectory);
+    emitProjectGuidance(configuration, targetDirectory);
     options.onProgress?.({
       status: "complete",
       id: "config",
@@ -205,7 +205,7 @@ export async function runBootstrapPhase(
     return { ok: false, phase: "config", message };
   }
 
-  const recipesResult = applyRecipes(config, targetDirectory, {
+  const recipesResult = applyRecipes(configuration, targetDirectory, {
     onStepStart: (step) =>
       options.onProgress?.({
         status: "start",
@@ -227,12 +227,12 @@ export async function runBootstrapPhase(
     };
   }
 
-  const install = resolvePackageManagerDriver(config.packageManager).install;
+  const install = resolvePackageManagerDriver(configuration.packageManager).install;
   const installResult = await runBootstrapPlan(
     [
       {
         id: "install-root",
-        description: `Install ${config.packageManager} dependencies`,
+        description: `Install ${configuration.packageManager} dependencies`,
         command: install.command,
         commandArguments: install.commandArguments,
         workingDirectory: targetDirectory,
@@ -273,10 +273,10 @@ export async function runBootstrapPhase(
     return { ok: false, phase: "recipes", message: `Starter documentation failed: ${message}` };
   }
 
-  if (config.stacks.hasMobile) {
+  if (configuration.stacks.hasMobile) {
     try {
       options.onProgress?.({ status: "start", id: "expo-starter-lint", description: "Preserve Expo starter lint compatibility" });
-      const mobileDirectory = config.topology === "monorepo" ? join(targetDirectory, "apps/mobile") : targetDirectory;
+      const mobileDirectory = configuration.topology === "monorepo" ? join(targetDirectory, "apps/mobile") : targetDirectory;
       applyExpoStarterLintCompatibility(mobileDirectory, options.starterCompiler);
       options.onProgress?.({ status: "complete", id: "expo-starter-lint", description: "Preserved Expo starter lint compatibility" });
     } catch (error) {
@@ -298,7 +298,7 @@ export async function runBootstrapPhase(
       "agent-guidance",
       ...recipesResult.appliedRecipes,
       "starter-documentation",
-      ...(config.stacks.hasMobile ? ["expo-starter-lint"] : []),
+      ...(configuration.stacks.hasMobile ? ["expo-starter-lint"] : []),
     ],
   };
 }

@@ -26,13 +26,13 @@ export const SUPPORTED_OPTIONS = {
     { value: "clerk", label: "Clerk" },
     { value: "none", label: "No authentication" },
   ],
-  webI18n: [{ value: "gt-next", label: "General Translation" }],
-  mobileI18n: [
+  webInternationalization: [{ value: "gt-next", label: "General Translation" }],
+  mobileInternationalization: [
     { value: "gt-react-native", label: "General Translation" },
     { value: "none", label: "No internationalization" },
   ],
-  webUi: [{ value: "shadcn-base-ui", label: "shadcn + Base UI" }],
-  mobileUi: [{ value: "nativewind", label: "NativeWind" }],
+  webUserInterface: [{ value: "shadcn-base-ui", label: "shadcn + Base UI" }],
+  mobileUserInterface: [{ value: "nativewind", label: "NativeWind" }],
 } as const;
 
 /** Extract schema-ready values while retaining each option's literal type. */
@@ -45,8 +45,8 @@ export function optionValues<
 }
 
 /** List mobile translation options supported by the selected Expo runtime. */
-export function compatibleMobileI18n(runtime: "expo-go" | "dev-build") {
-  return SUPPORTED_OPTIONS.mobileI18n.filter((option) =>
+export function compatibleMobileInternationalization(runtime: "expo-go" | "dev-build") {
+  return SUPPORTED_OPTIONS.mobileInternationalization.filter((option) =>
     runtime === "expo-go"
       ? option.value === "none"
       : option.value === "gt-react-native",

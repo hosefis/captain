@@ -1,6 +1,6 @@
 /**
- * ESLint rule config snippet — ban hardcoded toast/alert strings in UI code.
- * Merge into your ESLint flat config to enforce translated messages.
+ * ESLint rule configuration snippet — ban hardcoded toast/alert strings in UI code.
+ * Merge into your ESLint flat configuration to enforce translated messages.
  */
 export const internationalizationEnforcement = {
   rules: {

@@ -23,10 +23,10 @@ import {
   resolveSmokePlan,
 } from "../resolver/recipe-plan.js";
 import {
-  loadProjectConfigFromFile,
-  type NormalizedProjectConfig,
+  loadProjectConfigurationFromFile,
+  type NormalizedProjectConfiguration,
   type PackageManager,
-} from "../schema/project-config.js";
+} from "../schema/project-configuration.js";
 import type { Command } from "commander";
 import { getGlobalOptions } from "../cli-options.js";
 import {
@@ -67,15 +67,15 @@ export type InitPlan = {
 export type InitResult =
   | { status: "cancelled" }
   | { status: "validation_error"; message: string }
-  | { status: "blocked"; compatibility: CompatibilityResult; config: NormalizedProjectConfig }
+  | { status: "blocked"; compatibility: CompatibilityResult; config: NormalizedProjectConfiguration }
   | {
       status: "doc_drift_blocked";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       verifyDocs: DocumentationVerificationResult;
     }
   | {
       status: "dry_run";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
       verifyDocs?: DocumentationVerificationResult;
@@ -83,7 +83,7 @@ export type InitResult =
     }
   | {
       status: "success";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
@@ -94,7 +94,7 @@ export type InitResult =
     }
   | {
       status: "smoke_failed";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
@@ -105,7 +105,7 @@ export type InitResult =
     }
   | {
       status: "execution_failed";
-      config: NormalizedProjectConfig;
+      config: NormalizedProjectConfiguration;
       compatibility: CompatibilityResult;
       plan: InitPlan;
       directory: string;
@@ -173,14 +173,14 @@ async function loadConfiguration(
   options: InitOptions,
   packageManagerAvailability: PackageManagerAvailability,
 ): Promise<
-  | { ok: true; config: NormalizedProjectConfig }
+  | { ok: true; configuration: NormalizedProjectConfiguration }
   | { ok: false; message: string }
   | { ok: false; cancelled: true }
 > {
   if (options.config) {
     try {
-      const configuration = loadProjectConfigFromFile(options.config);
-      return { ok: true, config: configuration };
+      const configuration = loadProjectConfigurationFromFile(options.config);
+      return { ok: true, configuration };
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to parse project.json";
@@ -200,7 +200,7 @@ async function loadConfiguration(
     return { ok: false, cancelled: true };
   }
 
-  return { ok: true, config: wizard.config };
+  return { ok: true, configuration: wizard.configuration };
 }
 
 function unavailableManagerMessage(
@@ -241,7 +241,7 @@ async function confirmWarnings(
 
 /** Describe bootstrap, recipe, and validation work before executing a scaffold. */
 export function buildInitPlan(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   directory: string,
   agentMode: boolean,
 ): InitPlan {
@@ -282,7 +282,7 @@ export async function runInit(options: InitOptions): Promise<InitResult> {
     return { status: "validation_error", message: "message" in loaded ? loaded.message : "Invalid config" };
   }
 
-  const configuration = loaded.config;
+  const configuration = loaded.configuration;
   const unavailableManager = !packageManagerAvailability[configuration.packageManager];
   const managerWarning = unavailableManager
     ? unavailableManagerMessage(configuration.packageManager, packageManagerAvailability)

@@ -14,10 +14,10 @@ Project stack, layout, and development commands for developers and coding agents
 | Convex example | {convexExample} |
 | Code standards | {codeStandards} |
 | Auth | `{auth}` |
-| Web i18n | `{i18nWeb}` |
-| Mobile i18n | `{i18nMobile}` |
-| Web UI | `{uiWeb}` |
-| Mobile UI | `{uiMobile}` |
+| Web i18n | `{webInternationalization}` |
+| Mobile i18n | `{mobileInternationalization}` |
+| Web UI | `{webUserInterface}` |
+| Mobile UI | `{mobileUserInterface}` |
 | Locales | `{locales}` (default: `{defaultLocale}`) |
 | Expo runtime | `{runtime}` |
 

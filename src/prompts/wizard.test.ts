@@ -41,10 +41,10 @@ describe("runWizard backend selection", () => {
 
     const result = await runWizard({ yes: true, packageManagerAvailability: allAvailable });
 
-    expect("config" in result).toBe(true);
-    if ("config" in result) {
-      expect(result.config.backend).toBe("rest");
-      expect(result.config.convexExample).toBe(false);
+    expect("configuration" in result).toBe(true);
+    if ("configuration" in result) {
+      expect(result.configuration.backend).toBe("rest");
+      expect(result.configuration.convexExample).toBe(false);
     }
     expect(prompts.confirm).toHaveBeenCalledOnce();
     expect(prompts.confirm).toHaveBeenCalledWith({ message: "Enforce code standards during lint?", initialValue: false });
@@ -56,10 +56,10 @@ describe("runWizard backend selection", () => {
 
     const result = await runWizard({ yes: true, packageManagerAvailability: allAvailable });
 
-    expect("config" in result).toBe(true);
-    if ("config" in result) {
-      expect(result.config.backend).toBe("convex");
-      expect(result.config.convexExample).toBe(true);
+    expect("configuration" in result).toBe(true);
+    if ("configuration" in result) {
+      expect(result.configuration.backend).toBe("convex");
+      expect(result.configuration.convexExample).toBe(true);
     }
     expect(prompts.confirm).toHaveBeenCalledWith({
       message: "Include a working Convex task list example?",
@@ -74,7 +74,7 @@ describe("runWizard code standards", () => {
     prompts.select.mockResolvedValueOnce("rest").mockResolvedValueOnce("en");
     prompts.confirm.mockResolvedValueOnce(enabled);
     const result = await runWizard({ yes: true, packageManagerAvailability: allAvailable });
-    expect("config" in result && result.config.enforceCodeStandards).toBe(enabled);
+    expect("configuration" in result && result.configuration.enforceCodeStandards).toBe(enabled);
     expect(prompts.note.mock.calls[0]?.[0]).toContain(`Code standards enforcement: ${enabled ? "yes" : "no"}`);
   });
 
@@ -101,7 +101,7 @@ describe("runWizard package manager availability", () => {
       packageManagerAvailability: { pnpm: false, npm: true, bun: true },
     });
 
-    expect("config" in result && result.config.packageManager).toBe("npm");
+    expect("configuration" in result && result.configuration.packageManager).toBe("npm");
     expect(prompts.select).toHaveBeenCalledWith(expect.objectContaining({
       message: "Package manager",
       initialValue: "npm",
@@ -153,7 +153,7 @@ describe("runWizard package manager availability", () => {
       packageManagerAvailability: { pnpm: false, npm: false, bun: false },
     });
 
-    expect("config" in result && result.config.packageManager).toBe("bun");
+    expect("configuration" in result && result.configuration.packageManager).toBe("bun");
     expect(prompts.log.warn).toHaveBeenCalledWith(expect.stringContaining("A real run would stop here"));
   });
 });

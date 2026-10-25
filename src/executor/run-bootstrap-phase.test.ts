@@ -3,10 +3,10 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { runBootstrapPhase } from "./run-bootstrap-phase.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 import ts from "typescript";
 
-const webConfig: NormalizedProjectConfig = {
+const webConfiguration: NormalizedProjectConfiguration = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",
@@ -41,12 +41,12 @@ describe("runBootstrapPhase", () => {
     const directory = createTemporaryDirectory();
     const originalConfiguration = 'module.exports = [{ rules: { "no-console": "error" } }];\r\n';
     const hook = 'export function useColorScheme() { useEffect(() => { setHasHydrated(true); }, []); return "light"; }\n';
-    const config: NormalizedProjectConfig = {
-      ...webConfig, topology: "mobile", apps: ["mobile"], auth: "none", runtime: "expo-go",
+    const configuration: NormalizedProjectConfiguration = {
+      ...webConfiguration, topology: "mobile", apps: ["mobile"], auth: "none", runtime: "expo-go",
       i18n: { mobile: "none" }, ui: { mobile: "nativewind" },
       stacks: { hasWeb: false, hasMobile: true }, enforceCodeStandards: enabled,
     };
-    const result = await runBootstrapPhase(config, directory, {
+    const result = await runBootstrapPhase(configuration, directory, {
       simulateBootstrapOutput: true,
       starterCompiler: ts,
       bootstrapRunner: async (step) => {
@@ -59,9 +59,9 @@ describe("runBootstrapPhase", () => {
       },
     });
     expect(result).toMatchObject({ ok: true, appliedRecipes: expect.arrayContaining(["starter-documentation", "expo-starter-lint"]) });
-    const configuration = readFileSync(join(directory, "eslint.config.js"), "utf-8");
-    expect(configuration.startsWith(originalConfiguration)).toBe(true);
-    expect(configuration).toContain('"react-hooks/set-state-in-effect": "off"');
+    const eslintConfiguration = readFileSync(join(directory, "eslint.config.js"), "utf-8");
+    expect(eslintConfiguration.startsWith(originalConfiguration)).toBe(true);
+    expect(eslintConfiguration).toContain('"react-hooks/set-state-in-effect": "off"');
     expect(readFileSync(join(directory, "src/hooks/use-color-scheme.web.ts"), "utf-8")).toContain("/** Returns the platform color scheme after web hydration when applicable. */");
     expect(existsSync(join(directory, "tools/check-code-standards.mjs"))).toBe(enabled);
     const manifest = JSON.parse(readFileSync(join(directory, "package.json"), "utf-8")) as { devDependencies?: Record<string, string> };
@@ -72,7 +72,7 @@ describe("runBootstrapPhase", () => {
     const directory = createTemporaryDirectory();
     const progress: string[] = [];
     const original = "export default function Home() { return null; }\n";
-    const result = await runBootstrapPhase({ ...webConfig, enforceCodeStandards: enabled }, directory, {
+    const result = await runBootstrapPhase({ ...webConfiguration, enforceCodeStandards: enabled }, directory, {
       simulateBootstrapOutput: true,
       starterCompiler: ts,
       bootstrapRunner: async (step) => {
@@ -102,7 +102,7 @@ describe("runBootstrapPhase", () => {
     const targetDirectory = createTemporaryDirectory();
     const progress: string[] = [];
 
-    const result = await runBootstrapPhase(webConfig, targetDirectory, {
+    const result = await runBootstrapPhase(webConfiguration, targetDirectory, {
       bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
       simulateBootstrapOutput: true,
       onProgress: (event) => progress.push(`${event.status}:${event.id}`),
@@ -140,7 +140,7 @@ describe("runBootstrapPhase", () => {
   it("returns bootstrap failure from runner", async () => {
     const targetDirectory = createTemporaryDirectory();
 
-    const result = await runBootstrapPhase(webConfig, targetDirectory, {
+    const result = await runBootstrapPhase(webConfiguration, targetDirectory, {
       bootstrapRunner: async () => ({
         exitCode: 1,
         stdout: "",

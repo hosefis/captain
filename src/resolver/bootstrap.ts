@@ -1,4 +1,4 @@
-import type { NormalizedProjectConfig, PackageManager } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration, PackageManager } from "../schema/project-configuration.js";
 
 export type BootstrapStep = {
   id: string;
@@ -18,7 +18,7 @@ function packageExecutorCommand(packageManager: PackageManager): string {
   return "pnpm dlx";
 }
 
-function nextAppArguments(configuration: NormalizedProjectConfig, targetDirectory: string): string[] {
+function nextAppArguments(configuration: NormalizedProjectConfiguration, targetDirectory: string): string[] {
   const useFlag =
     configuration.packageManager === "pnpm"
       ? "--use-pnpm"
@@ -43,7 +43,7 @@ function expoAppArguments(targetDirectory: string): string[] {
   return ["create-expo-app@latest", targetDirectory, "--template", "default", "--yes"];
 }
 
-function turboArguments(configuration: NormalizedProjectConfig): string[] {
+function turboArguments(configuration: NormalizedProjectConfiguration): string[] {
   const packageManagerFlag =
     configuration.packageManager === "pnpm"
       ? "pnpm"
@@ -83,7 +83,7 @@ function spawnStep(
 
 /** Plan framework starter commands for the requested apps and topology. */
 export function resolveBootstrapPlan(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   targetDirectory: string,
 ): BootstrapStep[] {
   const steps: BootstrapStep[] = [];

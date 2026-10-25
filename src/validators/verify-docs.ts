@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { captainPackageRoot } from "../lib/paths.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
 export type DocumentationVersionEntry = {
   validated: string;
@@ -61,7 +61,7 @@ export function loadDocumentationVersionsManifest(): DocumentationVersionsManife
 }
 
 /** List registry packages used by the selected framework and integrations. */
-export function resolvePackagesForConfiguration(configuration: NormalizedProjectConfig): string[] {
+export function resolvePackagesForConfiguration(configuration: NormalizedProjectConfiguration): string[] {
   const packages = new Set<string>();
 
   if (configuration.topology === "web" || configuration.stacks.hasWeb) {
@@ -232,7 +232,7 @@ function buildIssues(
 
 /** Compare selected dependencies with npm and apply execution-mode drift policy. */
 export async function verifyDocumentationVersions(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   options: { agentMode: boolean; npmFetch?: NpmFetch; manifest?: DocumentationVersionsManifest },
 ): Promise<DocumentationVerificationResult> {
   const manifest = options.manifest ?? loadDocumentationVersionsManifest();

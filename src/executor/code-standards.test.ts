@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseProjectConfig } from "../schema/project-config.js";
+import { parseProjectConfiguration } from "../schema/project-configuration.js";
 
 const assets = vi.hoisted(() => ({ directory: "" }));
 vi.mock("../lib/paths.js", () => ({ captainPackageRoot: () => assets.directory }));
@@ -43,8 +43,8 @@ describe("optional code standards", () => {
     const target = temporaryDirectory();
     writeManifest(target, "node framework-lint.mjs");
     writeFileSync(join(target, "framework-lint.mjs"), 'console.log("framework ran");\n');
-    const config = parseProjectConfig({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true });
-    applyCodeStandards(config, target);
+    const configuration = parseProjectConfiguration({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true });
+    applyCodeStandards(configuration, target);
     const lint = readManifest(target).scripts.lint!;
     const passed = spawnSync(lint, { cwd: target, shell: true, encoding: "utf-8" });
     expect({ status: passed.status, stdout: passed.stdout }).toEqual({ status: 0, stdout: "framework ran\nstandards fixture ran\n" });
@@ -65,14 +65,14 @@ describe("optional code standards", () => {
       if (topology === "monorepo") {
         for (const packagePath of packages) writeManifest(join(target, packagePath), "tsc --noEmit");
       }
-      const config = parseProjectConfig({
+      const configuration = parseProjectConfiguration({
         name: "example", scope: "@example", topology, enforceCodeStandards: enabled,
         i18n: topology === "web" ? "gt-next" : topology === "mobile" ? "none" : { web: "gt-next", mobile: "none" },
         ui: topology === "web" ? "shadcn-base-ui" : topology === "mobile" ? "nativewind" : { web: "shadcn-base-ui", mobile: "nativewind" },
         ...(topology !== "web" ? { runtime: "expo-go" } : {}),
       });
       const previousManifest = readFileSync(join(target, "package.json"), "utf-8");
-      applyCodeStandards(config, target);
+      applyCodeStandards(configuration, target);
       expect(existsSync(join(target, "tools/check-code-standards.mjs"))).toBe(enabled);
       const manifest = readManifest(target);
       expect(manifest.scripts.lint).toBe(rootLint + (enabled ? " && node tools/check-code-standards.mjs ." : ""));
@@ -87,7 +87,7 @@ describe("optional code standards", () => {
         }
       }
       const first = readFileSync(join(target, "package.json"), "utf-8");
-      applyCodeStandards(config, target);
+      applyCodeStandards(configuration, target);
       expect(readFileSync(join(target, "package.json"), "utf-8")).toBe(first);
     });
   }
@@ -96,8 +96,8 @@ describe("optional code standards", () => {
     assets.directory = temporaryDirectory();
     const target = temporaryDirectory();
     writeManifest(target);
-    const config = parseProjectConfig({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true });
-    expect(() => applyCodeStandards(config, target)).toThrow(/check-code-standards/);
+    const configuration = parseProjectConfiguration({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true });
+    expect(() => applyCodeStandards(configuration, target)).toThrow(/check-code-standards/);
   });
 
   it.each([undefined, "~5.7.3", "^7.0.0"])("ensures a compatible root TypeScript version from %j", (version) => {
@@ -106,7 +106,7 @@ describe("optional code standards", () => {
     writeFileSync(join(assets.directory, "scripts/check-code-standards.mjs"), fixtureChecker);
     const target = temporaryDirectory();
     writeManifest(target, undefined, version);
-    applyCodeStandards(parseProjectConfig({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true }), target);
+    applyCodeStandards(parseProjectConfiguration({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true }), target);
     expect(readManifest(target).devDependencies.typescript).toBe("^5.8.2");
     expect(readManifest(target).scripts.lint).toBe("node tools/check-code-standards.mjs .");
   });
@@ -117,7 +117,7 @@ describe("optional code standards", () => {
     writeFileSync(join(assets.directory, "scripts/check-code-standards.mjs"), fixtureChecker);
     const target = temporaryDirectory();
     writeManifest(target, "eslint .", version);
-    applyCodeStandards(parseProjectConfig({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true }), target);
+    applyCodeStandards(parseProjectConfiguration({ name: "example", scope: "@example", topology: "web", i18n: "gt-next", ui: "shadcn-base-ui", enforceCodeStandards: true }), target);
     expect(readManifest(target).devDependencies.typescript).toBe(version);
   });
 });

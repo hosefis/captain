@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseProjectConfig,
-  projectConfigJsonSchema,
-} from "../schema/project-config.js";
+  parseProjectConfiguration,
+  projectConfigurationJsonSchema,
+} from "../schema/project-configuration.js";
 import { loadCompatibilityMatrix, resolveCompatibility } from "./compatibility.js";
 
 const webInput = {
@@ -18,15 +18,15 @@ const webInput = {
   defaultLocale: "en",
 } as const;
 
-describe("project config", () => {
+describe("project configuration", () => {
   it("normalizes standalone web", () => {
-    const configuration = parseProjectConfig(webInput);
+    const configuration = parseProjectConfiguration(webInput);
     expect(configuration.apps).toEqual(["web"]);
     expect(configuration.i18n).toEqual({ web: "gt-next" });
   });
 
   it("normalizes the supported monorepo composition", () => {
-    const configuration = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...webInput,
       topology: "monorepo",
       runtime: "dev-build",
@@ -37,7 +37,7 @@ describe("project config", () => {
   });
 
   it("supports Expo Go without mobile i18n", () => {
-    const configuration = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...webInput,
       topology: "mobile",
       runtime: "expo-go",
@@ -49,7 +49,7 @@ describe("project config", () => {
 
   it("rejects GT React Native with Expo Go", () => {
     expect(() =>
-      parseProjectConfig({
+      parseProjectConfiguration({
         ...webInput,
         topology: "mobile",
         runtime: "expo-go",
@@ -66,12 +66,12 @@ describe("project config", () => {
       { ...webInput, modules: ["authorization"] },
       { ...webInput, validation: "relaxed" },
     ]) {
-      expect(() => parseProjectConfig(input)).toThrow();
+      expect(() => parseProjectConfiguration(input)).toThrow();
     }
   });
 
   it("exports JSON Schema", () => {
-    expect(projectConfigJsonSchema()).toHaveProperty("type", "object");
+    expect(projectConfigurationJsonSchema()).toHaveProperty("type", "object");
   });
 });
 
@@ -81,7 +81,7 @@ describe("compatibility policy", () => {
   });
 
   it("passes every schema-supported configuration", () => {
-    const configuration = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...webInput,
       topology: "mobile",
       runtime: "dev-build",

@@ -1,7 +1,7 @@
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { captainPackageRoot } from "../lib/paths.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
 function extendLint(packagePath: string, checkerPath: string, isRootPackage: boolean): void {
   const manifest = JSON.parse(readFileSync(packagePath, "utf-8")) as {
@@ -28,8 +28,8 @@ function extendLint(packagePath: string, checkerPath: string, isRootPackage: boo
 }
 
 /** Installs package-owned tooling and preserves each framework's existing lint checks. */
-export function applyCodeStandards(config: NormalizedProjectConfig, targetDirectory: string): void {
-  if (!config.enforceCodeStandards) return;
+export function applyCodeStandards(configuration: NormalizedProjectConfiguration, targetDirectory: string): void {
+  if (!configuration.enforceCodeStandards) return;
 
   const toolsDirectory = join(targetDirectory, "tools");
   mkdirSync(toolsDirectory, { recursive: true });
@@ -38,7 +38,7 @@ export function applyCodeStandards(config: NormalizedProjectConfig, targetDirect
     join(toolsDirectory, "check-code-standards.mjs"),
   );
   extendLint(join(targetDirectory, "package.json"), "tools/check-code-standards.mjs", true);
-  if (config.topology !== "monorepo") return;
+  if (configuration.topology !== "monorepo") return;
 
   for (const workspace of ["apps", "packages"]) {
     const directory = join(targetDirectory, workspace);

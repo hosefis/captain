@@ -6,12 +6,12 @@ import { tmpdir } from "node:os";
 import { afterAll, describe, expect, it } from "vitest";
 import { captainPackageRoot } from "../lib/paths.js";
 import { runBootstrapPhase } from "../executor/run-bootstrap-phase.js";
-import { normalizeProjectConfig, parseProjectConfig, type NormalizedProjectConfig, type ProjectConfig } from "../schema/project-config.js";
+import { normalizeProjectConfiguration, parseProjectConfiguration, type NormalizedProjectConfiguration, type ProjectConfiguration } from "../schema/project-configuration.js";
 import { resolveSmokeSteps, runSmokeValidation } from "../validators/smoke.js";
 import { resolvePackageManagerDriver } from "../executor/package-manager.js";
-import type { PackageManager } from "../schema/project-config.js";
+import type { PackageManager } from "../schema/project-configuration.js";
 
-function tierABase(overrides: Partial<ProjectConfig>): ProjectConfig {
+function tierABase(overrides: Partial<ProjectConfiguration>): ProjectConfiguration {
   return {
     name: "acme-platform",
     scope: "@acme",
@@ -32,12 +32,12 @@ function tierABase(overrides: Partial<ProjectConfig>): ProjectConfig {
 const tierAFixtures = [
   {
     id: "web",
-    config: normalizeProjectConfig(parseProjectConfig(tierABase({ topology: "web" }))),
+    configuration: normalizeProjectConfiguration(parseProjectConfiguration(tierABase({ topology: "web" }))),
   },
   {
     id: "mobile",
-    config: normalizeProjectConfig(
-      parseProjectConfig(
+    configuration: normalizeProjectConfiguration(
+      parseProjectConfiguration(
         tierABase({
           topology: "mobile",
           runtime: "dev-build",
@@ -49,8 +49,8 @@ const tierAFixtures = [
   },
   {
     id: "monorepo",
-    config: normalizeProjectConfig(
-      parseProjectConfig(
+    configuration: normalizeProjectConfiguration(
+      parseProjectConfiguration(
         tierABase({
           topology: "monorepo",
           apps: ["web", "mobile"],
@@ -63,7 +63,7 @@ const tierAFixtures = [
   },
   {
     id: "mobile-expo-go",
-    config: parseProjectConfig(tierABase({
+    configuration: parseProjectConfiguration(tierABase({
       topology: "mobile",
       runtime: "expo-go",
       auth: "none",
@@ -73,11 +73,11 @@ const tierAFixtures = [
   },
   {
     id: "convex-web",
-    config: parseProjectConfig(tierABase({ backend: "convex", auth: "none" })),
+    configuration: parseProjectConfiguration(tierABase({ backend: "convex", auth: "none" })),
   },
   {
     id: "convex-expo-go-example",
-    config: parseProjectConfig(tierABase({
+    configuration: parseProjectConfiguration(tierABase({
       topology: "mobile",
       runtime: "expo-go",
       backend: "convex",
@@ -89,7 +89,7 @@ const tierAFixtures = [
   },
   {
     id: "convex-monorepo-example",
-    config: parseProjectConfig(tierABase({
+    configuration: parseProjectConfiguration(tierABase({
       topology: "monorepo",
       apps: ["web", "mobile"],
       runtime: "dev-build",
@@ -141,16 +141,16 @@ function expectProjectOwnedFiles(directory: string): void {
 }
 
 /** Checks that application layouts import and render the providers emitted beside them. */
-function expectProviderConnections(directory: string, config: NormalizedProjectConfig): void {
-  for (const app of config.apps) {
-    const sourceDirectory = config.topology === "monorepo"
+function expectProviderConnections(directory: string, configuration: NormalizedProjectConfiguration): void {
+  for (const app of configuration.apps) {
+    const sourceDirectory = configuration.topology === "monorepo"
       ? join(directory, "apps", app, "src")
       : join(directory, "src");
-    const provider = config.backend === "convex" ? "ConvexProvider" : "AuthenticationProvider";
-    const providerPath = config.backend === "convex"
+    const provider = configuration.backend === "convex" ? "ConvexProvider" : "AuthenticationProvider";
+    const providerPath = configuration.backend === "convex"
       ? "integrations/convex/convex-provider"
       : "integrations/auth/authentication-provider";
-    if (config.backend !== "convex" && config.auth === "none") {
+    if (configuration.backend !== "convex" && configuration.auth === "none") {
       expect(existsSync(join(sourceDirectory, `${providerPath}.tsx`))).toBe(false);
       continue;
     }
@@ -171,10 +171,10 @@ describe("Tier A golden fixtures (pre-publish matrix)", () => {
   for (const packageManager of ["pnpm", "npm", "bun"] as PackageManager[]) {
     for (const fixture of tierAFixtures) {
       it(`scaffolds ${packageManager} ${fixture.id} and passes agent smoke plan`, async () => {
-        const config = { ...fixture.config, packageManager };
+        const configuration = { ...fixture.configuration, packageManager };
         const directory = createTemporaryDirectory(fixture.id);
 
-        const bootstrap = await runBootstrapPhase(config, directory, {
+        const bootstrap = await runBootstrapPhase(configuration, directory, {
           bootstrapRunner: async () => ({ exitCode: 0, stdout: "", stderr: "" }),
           simulateBootstrapOutput: true,
         });
@@ -187,9 +187,9 @@ describe("Tier A golden fixtures (pre-publish matrix)", () => {
         expect(bootstrap.appliedRecipes).not.toContain("project-json");
         expect(bootstrap.appliedRecipes).toContain("starter-documentation");
         expectProjectOwnedFiles(directory);
-        expectProviderConnections(directory, config);
+        expectProviderConnections(directory, configuration);
 
-        const smokeSteps = resolveSmokeSteps(config, true);
+        const smokeSteps = resolveSmokeSteps(configuration, true);
         expect(smokeSteps).toEqual(["typecheck", "lint", "build"]);
 
         const smoke = await runSmokeValidation(directory, smokeSteps, {
@@ -212,10 +212,10 @@ describe("enabled scaffolds with distributed checker assets (requires M1 integra
   for (const fixture of tierAFixtures) {
     it(`checks ${fixture.id} editable source and excludes external generated bindings`, async () => {
       const directory = createTemporaryDirectory(`standards-${fixture.id}`);
-      const config = { ...fixture.config, enforceCodeStandards: true };
+      const configuration = { ...fixture.configuration, enforceCodeStandards: true };
       const require = createRequire(import.meta.url);
       const typescriptDirectory = join(require.resolve("typescript/package.json"), "..");
-      const result = await runBootstrapPhase(config, directory, {
+      const result = await runBootstrapPhase(configuration, directory, {
         bootstrapRunner: async (step) => {
           if (step.id === "install-root") {
             mkdirSync(join(directory, "node_modules"), { recursive: true });

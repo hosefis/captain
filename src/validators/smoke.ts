@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execa } from "execa";
 import { resolveSmokePlan } from "../resolver/recipe-plan.js";
-import type { NormalizedProjectConfig, PackageManager } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration, PackageManager } from "../schema/project-configuration.js";
 import { resolvePackageManagerDriver } from "../executor/package-manager.js";
 
 export type SmokeStep = "typecheck" | "lint" | "build";
@@ -41,7 +41,7 @@ export function smokeFixHint(step: SmokeStep): string {
 
 /** Select project validation steps for the requested execution mode. */
 export function resolveSmokeSteps(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   agentMode: boolean,
 ): SmokeStep[] {
   return resolveSmokePlan(configuration, agentMode) as SmokeStep[];

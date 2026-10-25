@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
 export type CompatibilityMode = "agent" | "human";
 
@@ -83,7 +83,7 @@ function issueId(prefix: string, id: string | undefined, fallback: string): stri
   return id ?? `${prefix}:${fallback}`;
 }
 
-function activeStacks(configuration: NormalizedProjectConfig): StackKind[] {
+function activeStacks(configuration: NormalizedProjectConfiguration): StackKind[] {
   const stacks: StackKind[] = [];
   if (configuration.stacks.hasWeb) {
     stacks.push("next");
@@ -94,8 +94,8 @@ function activeStacks(configuration: NormalizedProjectConfig): StackKind[] {
   return stacks;
 }
 
-function i18nForStack(
-  configuration: NormalizedProjectConfig,
+function internationalizationForStack(
+  configuration: NormalizedProjectConfiguration,
   stack: StackKind,
 ): string | undefined {
   if (stack === "next") {
@@ -108,7 +108,7 @@ function i18nForStack(
 }
 
 function matchesHardBlock(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   rule: HardBlockRule,
 ): boolean {
   if (!rule.stack) {
@@ -120,7 +120,7 @@ function matchesHardBlock(
     return false;
   }
 
-  if (rule.i18n !== undefined && i18nForStack(configuration, rule.stack) !== rule.i18n) {
+  if (rule.i18n !== undefined && internationalizationForStack(configuration, rule.stack) !== rule.i18n) {
     return false;
   }
 
@@ -136,7 +136,7 @@ function matchesHardBlock(
 }
 
 function matchesSoftWarn(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   rule: SoftWarnRule,
 ): boolean {
   if (rule.stack) {
@@ -144,7 +144,7 @@ function matchesSoftWarn(
       return false;
     }
 
-    if (rule.i18n !== undefined && i18nForStack(configuration, rule.stack) !== rule.i18n) {
+    if (rule.i18n !== undefined && internationalizationForStack(configuration, rule.stack) !== rule.i18n) {
       return false;
     }
 
@@ -165,7 +165,7 @@ function matchesSoftWarn(
 }
 
 function matchesRecipeBlock(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   rule: RecipeBlockRule,
 ): boolean {
   if (rule.backend !== undefined && configuration.backend !== rule.backend) {
@@ -195,7 +195,7 @@ function matchesRecipeBlock(
 
 /** Classify stack constraints as warnings or blocks for human and agent execution. */
 export function resolveCompatibility(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   options: {
     mode?: CompatibilityMode;
     matrix?: CompatibilityMatrix;

@@ -1,9 +1,9 @@
 const { defineConfig } = require("eslint/config");
-const expoConfig = require("eslint-config-expo/flat");
+const expoConfiguration = require("eslint-config-expo/flat");
 
 /** Applies Expo lint rules and permits the starter's web hydration hook. */
 module.exports = defineConfig([
-  expoConfig,
+  expoConfiguration,
   { ignores: ["dist/*", "convex/_generated/*"] },
   /** Expo starter hydration compatibility. */
   {

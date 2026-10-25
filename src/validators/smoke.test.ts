@@ -10,9 +10,9 @@ import {
   smokeFixHint,
   type SmokeRunner,
 } from "./smoke.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
-const tierAWebConfiguration: NormalizedProjectConfig = {
+const tierAWebConfiguration: NormalizedProjectConfiguration = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",

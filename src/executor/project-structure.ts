@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, unlink
 import { join } from "node:path";
 import { copyTemplateTree } from "../generators/template.js";
 import { templatesDirectory } from "../lib/paths.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
 
 const PNPM_ONLY_BUILT_DEPENDENCIES = [
@@ -85,7 +85,7 @@ function writeTurboJson(targetDirectory: string): void {
 
 function patchMonorepoRoot(
   targetDirectory: string,
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
 ): void {
   const packagePath = join(targetDirectory, "package.json");
   const current = existsSync(packagePath)
@@ -127,7 +127,7 @@ function patchMonorepoRoot(
 
 function emitPackageSkeletons(
   targetDirectory: string,
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
 ): void {
   const scopeName = configuration.scope.replace(/^@/, "");
   const workspaceRange =
@@ -200,7 +200,7 @@ function patchMonorepoEslintConfiguration(targetDirectory: string): void {
 
 function createStandaloneDirectories(
   targetDirectory: string,
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
 ): void {
   for (const directory of [
     "src/app",
@@ -247,7 +247,7 @@ function createStandaloneDirectories(
 
 /** Configure framework workspaces and create the selected project directory structure. */
 export function applyProjectStructure(
-  configuration: NormalizedProjectConfig,
+  configuration: NormalizedProjectConfiguration,
   targetDirectory: string,
 ): void {
   if (configuration.topology !== "monorepo") {

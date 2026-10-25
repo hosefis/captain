@@ -2,11 +2,11 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { applyConfigEmit } from "./config-emit.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import { emitProjectGuidance } from "./project-guidance.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 import { captainPackageRoot } from "../lib/paths.js";
 
-const config: NormalizedProjectConfig = {
+const configuration: NormalizedProjectConfiguration = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",
@@ -35,20 +35,20 @@ afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true });
 });
 
-describe("applyConfigEmit", () => {
+describe("emitProjectGuidance", () => {
   it("writes project documentation and environment examples without scaffold configuration", () => {
     const targetDirectory = createTemporaryDirectory();
 
-    applyConfigEmit(config, targetDirectory);
+    emitProjectGuidance(configuration, targetDirectory);
 
     const context = readFileSync(join(targetDirectory, "CONTEXT.md"), "utf-8");
     expect(context).toContain("acme-web");
     expect(context).toContain("@acme");
     expect(context).not.toMatch(/captain|project\.json|compatibility\.json/i);
 
-    const envExample = readFileSync(join(targetDirectory, ".env.example"), "utf-8");
-    expect(envExample).toContain("DEFAULT_LOCALE=en");
-    expect(envExample).not.toMatch(/captain/i);
+    const environmentExample = readFileSync(join(targetDirectory, ".env.example"), "utf-8");
+    expect(environmentExample).toContain("DEFAULT_LOCALE=en");
+    expect(environmentExample).not.toMatch(/captain/i);
 
     expect(existsSync(join(targetDirectory, "project.json"))).toBe(false);
     expect(readFileSync(join(targetDirectory, "AGENTS.md"), "utf-8")).toContain(
@@ -63,7 +63,7 @@ describe("applyConfigEmit", () => {
     const contents = '{"customSetting":true}\n';
     writeFileSync(join(targetDirectory, "project.json"), contents);
 
-    applyConfigEmit(config, targetDirectory);
+    emitProjectGuidance(configuration, targetDirectory);
 
     expect(readFileSync(join(targetDirectory, "project.json"), "utf-8")).toBe(contents);
   });
@@ -71,11 +71,11 @@ describe("applyConfigEmit", () => {
   it("emits only Convex backend variables for a Convex project", () => {
     const targetDirectory = createTemporaryDirectory();
 
-    applyConfigEmit({ ...config, backend: "convex", convexExample: true }, targetDirectory);
+    emitProjectGuidance({ ...configuration, backend: "convex", convexExample: true }, targetDirectory);
 
-    const envExample = readFileSync(join(targetDirectory, ".env.example"), "utf-8");
-    expect(envExample).toContain("NEXT_PUBLIC_CONVEX_URL=");
-    expect(envExample).not.toContain("API_BASE_URL");
+    const environmentExample = readFileSync(join(targetDirectory, ".env.example"), "utf-8");
+    expect(environmentExample).toContain("NEXT_PUBLIC_CONVEX_URL=");
+    expect(environmentExample).not.toContain("API_BASE_URL");
     expect(readFileSync(join(targetDirectory, "CONTEXT.md"), "utf-8")).toContain(
       "Convex example | enabled",
     );

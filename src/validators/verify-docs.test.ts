@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 import {
   classifyDrift,
   formatDocumentationVersionReport,
@@ -9,7 +9,7 @@ import {
   type NpmFetch,
 } from "./verify-docs.js";
 
-const tierAWebConfiguration: NormalizedProjectConfig = {
+const tierAWebConfiguration: NormalizedProjectConfiguration = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",

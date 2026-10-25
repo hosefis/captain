@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseProjectConfig } from "../schema/project-config.js";
+import { parseProjectConfiguration } from "../schema/project-configuration.js";
 import { resolveRecipePlan } from "./recipe-plan.js";
 
 function web(authentication: "clerk" | "none" = "clerk") {
-  return parseProjectConfig({
+  return parseProjectConfiguration({
     name: "acme",
     scope: "@acme",
     packageManager: "pnpm",
@@ -19,8 +19,8 @@ function web(authentication: "clerk" | "none" = "clerk") {
 
 describe("resolveRecipePlan", () => {
   it.each([false, true])("plans Expo compatibility in both modes with enforcement %j", (enabled) => {
-    const config = parseProjectConfig({ name: "mobile", scope: "@mobile", topology: "mobile", runtime: "expo-go", auth: "none", i18n: "none", ui: "nativewind", enforceCodeStandards: enabled });
-    expect(resolveRecipePlan(config).at(-1)?.id).toBe("expo-starter-lint");
+    const configuration = parseProjectConfiguration({ name: "mobile", scope: "@mobile", topology: "mobile", runtime: "expo-go", auth: "none", i18n: "none", ui: "nativewind", enforceCodeStandards: enabled });
+    expect(resolveRecipePlan(configuration).at(-1)?.id).toBe("expo-starter-lint");
   });
   it.each([false, true])("always plans guidance and reflects enforcement %j", (enabled) => {
     const plan = resolveRecipePlan({ ...web(), enforceCodeStandards: enabled });

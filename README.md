@@ -255,6 +255,10 @@ check scans the whole workspace and excludes dependencies, build outputs, and
 machine-generated files such as Convex `_generated` bindings. The checker errors
 on barrel exports and missing public intent documentation, and warns on control
 flow nested more than three levels. Naming and simplicity remain review guidance.
+Captain-owned names use complete words such as `configuration` and
+`environmentExample`. Established acronyms and external contracts retain their
+names, including `--config`, JSON `auth`, Convex `args`, Next.js `config`, and
+framework imports such as `defineConfig` and `AuthConfig`.
 The generated checker runs independently of Captain and can also be invoked with
 `node tools/check-code-standards.mjs [scan roots]`; its default root is the current
 directory. Disabled enforcement adds guidance without standards tooling,

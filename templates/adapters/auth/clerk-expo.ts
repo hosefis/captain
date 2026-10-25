@@ -2,7 +2,7 @@
  * Clerk auth adapter for Expo.
  * Requires @clerk/expo and expo-secure-store — see Clerk Expo docs.
  */
-export const clerkExpoConfig = {
+export const clerkExpoConfiguration = {
   publishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "",
 } as const;
 

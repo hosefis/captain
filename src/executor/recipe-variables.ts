@@ -1,9 +1,9 @@
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
 export type RecipeVariables = Record<string, string>;
 
 /** Resolve project names and stack selections for recipe template substitution. */
-export function buildRecipeVariables(configuration: NormalizedProjectConfig): RecipeVariables {
+export function buildRecipeVariables(configuration: NormalizedProjectConfiguration): RecipeVariables {
   const scopeName = configuration.scope.replace(/^@/, "");
 
   return {

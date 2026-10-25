@@ -4,16 +4,16 @@ import {
   type PackageManagerAvailability,
 } from "../lib/package-manager-availability.js";
 import {
-  parseProjectConfig,
+  parseProjectConfiguration,
   type Authentication,
   type Backend,
   type ExpoRuntime,
-  type NormalizedProjectConfig,
+  type NormalizedProjectConfiguration,
   type PackageManager,
   type Topology,
-} from "../schema/project-config.js";
+} from "../schema/project-configuration.js";
 import {
-  compatibleMobileI18n,
+  compatibleMobileInternationalization,
   SUPPORTED_OPTIONS,
   type SupportedOption,
 } from "../supported-options.js";
@@ -21,7 +21,7 @@ import {
 type WizardResult =
   | { cancelled: true }
   | { error: string }
-  | { cancelled: false; config: NormalizedProjectConfig };
+  | { cancelled: false; configuration: NormalizedProjectConfiguration };
 
 const packageManagers: readonly PackageManager[] = ["pnpm", "npm", "bun"];
 
@@ -69,29 +69,29 @@ async function selectSupported(
   });
 }
 
-function summary(config: NormalizedProjectConfig): string {
+function summary(configuration: NormalizedProjectConfiguration): string {
   const lines = [
-    `Project: ${config.name}`,
-    `Package manager: ${config.packageManager}`,
-    `Topology: ${config.topology}`,
+    `Project: ${configuration.name}`,
+    `Package manager: ${configuration.packageManager}`,
+    `Topology: ${configuration.topology}`,
   ];
-  if (config.runtime) {
-    lines.push(`Expo runtime: ${config.runtime}`);
+  if (configuration.runtime) {
+    lines.push(`Expo runtime: ${configuration.runtime}`);
   }
   lines.push(
-    `Authentication: ${config.auth}`,
-    `Backend: ${config.backend}`,
-    `Convex example: ${config.convexExample ? "yes" : "no"}`,
-    `Code standards enforcement: ${config.enforceCodeStandards ? "yes" : "no"}`,
-    `Web i18n: ${config.i18n.web ?? "n/a"}`,
-    `Mobile i18n: ${config.i18n.mobile ?? "n/a"}`,
-    `Web UI: ${config.ui.web ?? "n/a"}`,
-    `Mobile UI: ${config.ui.mobile ?? "n/a"}`,
+    `Authentication: ${configuration.auth}`,
+    `Backend: ${configuration.backend}`,
+    `Convex example: ${configuration.convexExample ? "yes" : "no"}`,
+    `Code standards enforcement: ${configuration.enforceCodeStandards ? "yes" : "no"}`,
+    `Web i18n: ${configuration.i18n.web ?? "n/a"}`,
+    `Mobile i18n: ${configuration.i18n.mobile ?? "n/a"}`,
+    `Web UI: ${configuration.ui.web ?? "n/a"}`,
+    `Mobile UI: ${configuration.ui.mobile ?? "n/a"}`,
   );
-  if (config.i18n.web !== undefined || config.i18n.mobile !== "none") {
+  if (configuration.i18n.web !== undefined || configuration.i18n.mobile !== "none") {
     lines.push(
-      `Locales: ${config.locales.join(", ")}`,
-      `Default locale: ${config.defaultLocale}`,
+      `Locales: ${configuration.locales.join(", ")}`,
+      `Default locale: ${configuration.defaultLocale}`,
     );
   }
   return lines.join("\n");
@@ -211,7 +211,7 @@ export async function runWizard(
   const mobileInternationalization = runtime
     ? (await selectSupported(
         "Mobile internationalization",
-        compatibleMobileI18n(runtime),
+        compatibleMobileInternationalization(runtime),
       ))
     : undefined;
   if (mobileInternationalization !== undefined && cancelIfNeeded(mobileInternationalization)) {
@@ -258,7 +258,7 @@ export async function runWizard(
     return { cancelled: true };
   }
 
-  const config = parseProjectConfig({
+  const configuration = parseProjectConfiguration({
     name: name.trim(),
     scope: deriveScopeFromProjectName(name),
     packageManager: packageManager as PackageManager,
@@ -270,27 +270,27 @@ export async function runWizard(
     i18n:
       topology === "monorepo"
         ? {
-            web: SUPPORTED_OPTIONS.webI18n[0].value,
+            web: SUPPORTED_OPTIONS.webInternationalization[0].value,
             mobile: mobileInternationalization,
           }
         : topology === "web"
-          ? SUPPORTED_OPTIONS.webI18n[0].value
+          ? SUPPORTED_OPTIONS.webInternationalization[0].value
           : mobileInternationalization,
     ui:
       topology === "monorepo"
         ? {
-            web: SUPPORTED_OPTIONS.webUi[0].value,
-            mobile: SUPPORTED_OPTIONS.mobileUi[0].value,
+            web: SUPPORTED_OPTIONS.webUserInterface[0].value,
+            mobile: SUPPORTED_OPTIONS.mobileUserInterface[0].value,
           }
         : topology === "web"
-          ? SUPPORTED_OPTIONS.webUi[0].value
-          : SUPPORTED_OPTIONS.mobileUi[0].value,
+          ? SUPPORTED_OPTIONS.webUserInterface[0].value
+          : SUPPORTED_OPTIONS.mobileUserInterface[0].value,
     locales,
     defaultLocale,
     runtime,
   });
 
-  prompts.note(summary(config), "Configuration");
+  prompts.note(summary(configuration), "Configuration");
   if (!options.yes) {
     const confirmed = await prompts.confirm({
       message: "Create this project?",
@@ -303,5 +303,5 @@ export async function runWizard(
   }
 
   prompts.outro("Configuration confirmed");
-  return { cancelled: false, config };
+  return { cancelled: false, configuration };
 }

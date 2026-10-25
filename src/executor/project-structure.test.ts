@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
-import { parseProjectConfig } from "../schema/project-config.js";
+import { parseProjectConfiguration } from "../schema/project-configuration.js";
 import { applyProjectStructure } from "./project-structure.js";
 
 function directory(label: string): string {
@@ -27,7 +27,7 @@ const base = {
 
 describe("applyProjectStructure", () => {
   it("keeps standalone projects at the framework root", () => {
-    const configuration = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       topology: "web",
       i18n: "gt-next",
@@ -47,7 +47,7 @@ describe("applyProjectStructure", () => {
   });
 
   it("makes a scaffold-generated pnpm config valid for a standalone root", () => {
-    const configuration = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       topology: "web",
       i18n: "gt-next",
@@ -71,7 +71,7 @@ describe("applyProjectStructure", () => {
   });
 
   it("creates shared packages only for explicit monorepos", () => {
-    const configuration = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       topology: "monorepo",
       runtime: "expo-go",
@@ -109,7 +109,7 @@ describe("applyProjectStructure", () => {
   });
 
   it("resolves the shared Babel preset from its own package for Bun installs", () => {
-    const configuration = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       packageManager: "bun",
       topology: "monorepo",

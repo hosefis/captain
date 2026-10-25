@@ -3,9 +3,9 @@ import {
   formatBootstrapCommand,
   resolveBootstrapPlan,
 } from "./bootstrap.js";
-import type { NormalizedProjectConfig } from "../schema/project-config.js";
+import type { NormalizedProjectConfiguration } from "../schema/project-configuration.js";
 
-const webConfiguration: NormalizedProjectConfig = {
+const webConfiguration: NormalizedProjectConfiguration = {
   name: "acme-web",
   scope: "@acme",
   packageManager: "pnpm",
@@ -22,7 +22,7 @@ const webConfiguration: NormalizedProjectConfig = {
   stacks: { hasWeb: true, hasMobile: false },
 };
 
-const monorepoConfiguration: NormalizedProjectConfig = {
+const monorepoConfiguration: NormalizedProjectConfiguration = {
   ...webConfiguration,
   name: "acme-platform",
   topology: "monorepo",
@@ -45,7 +45,7 @@ describe("resolveBootstrapPlan", () => {
   });
 
   it("plans create-expo-app for mobile topology", () => {
-    const mobileConfiguration: NormalizedProjectConfig = {
+    const mobileConfiguration: NormalizedProjectConfiguration = {
       ...webConfiguration,
       topology: "mobile",
       apps: ["mobile"],
@@ -82,7 +82,7 @@ describe("resolveBootstrapPlan", () => {
   });
 
   it("uses npx for npm package manager", () => {
-    const npmConfiguration: NormalizedProjectConfig = {
+    const npmConfiguration: NormalizedProjectConfiguration = {
       ...webConfiguration,
       packageManager: "npm",
     };

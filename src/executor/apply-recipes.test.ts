@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseProjectConfig } from "../schema/project-config.js";
+import { parseProjectConfiguration } from "../schema/project-configuration.js";
 import { applyProjectStructure } from "./project-structure.js";
 import { applyRecipes } from "./apply-recipes.js";
 
@@ -37,20 +37,20 @@ const base = {
 
 describe("standalone recipes", () => {
   it.each(["js", "mjs", "cjs", "ts", "mts", "cts"])("preserves custom Expo framework lint configuration in %s", (extension) => {
-    const config = parseProjectConfig({ ...base, topology: "mobile", runtime: "expo-go", auth: "none", i18n: "none", ui: "nativewind" });
+    const configuration = parseProjectConfiguration({ ...base, topology: "mobile", runtime: "expo-go", auth: "none", i18n: "none", ui: "nativewind" });
     const directory = createProjectDirectory("mobile-preserved-eslint");
-    applyProjectStructure(config, directory);
-    const configuration = '[{ rules: { "no-console": "error" } }]';
+    applyProjectStructure(configuration, directory);
+    const eslintConfiguration = '[{ rules: { "no-console": "error" } }]';
     const original = ["js", "cjs", "cts"].includes(extension)
-      ? `// Application-owned rules.\r\nmodule.exports = ${configuration};`
-      : `// Application-owned rules.\r\nexport default ${configuration};`;
+      ? `// Application-owned rules.\r\nmodule.exports = ${eslintConfiguration};`
+      : `// Application-owned rules.\r\nexport default ${eslintConfiguration};`;
     writeFileSync(join(directory, `eslint.config.${extension}`), original);
-    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(applyRecipes(configuration, directory).ok).toBe(true);
     expect(readFileSync(join(directory, `eslint.config.${extension}`), "utf-8")).toBe(original);
     expect(existsSync(join(directory, "eslint.config.js"))).toBe(extension === "js");
   });
   it("emits Next.js code into framework-native src directories", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       topology: "web",
       auth: "clerk",
@@ -58,9 +58,9 @@ describe("standalone recipes", () => {
       ui: "shadcn-base-ui",
     });
     const directory = createProjectDirectory("web");
-    applyProjectStructure(config, directory);
+    applyProjectStructure(configuration, directory);
 
-    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(applyRecipes(configuration, directory).ok).toBe(true);
     expect(existsSync(join(directory, "src/lib/backend/client.ts"))).toBe(true);
     expect(existsSync(join(directory, "src/lib/index.ts"))).toBe(false);
     expect(existsSync(join(directory, "src/features/authorization/types.ts"))).toBe(true);
@@ -80,7 +80,7 @@ describe("standalone recipes", () => {
   });
 
   it("adds Clerk's Expo runtime dependencies before installation", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       topology: "mobile",
       runtime: "dev-build",
@@ -89,9 +89,9 @@ describe("standalone recipes", () => {
       ui: "nativewind",
     });
     const directory = createProjectDirectory("mobile-clerk");
-    applyProjectStructure(config, directory);
+    applyProjectStructure(configuration, directory);
 
-    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(applyRecipes(configuration, directory).ok).toBe(true);
     const manifest = JSON.parse(
       readFileSync(join(directory, "package.json"), "utf-8"),
     ) as { dependencies: Record<string, string>; devDependencies: Record<string, string> };
@@ -107,7 +107,7 @@ describe("standalone recipes", () => {
   });
 
   it("supports Expo Go with no i18n and no authentication", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       topology: "mobile",
       runtime: "expo-go",
@@ -116,9 +116,9 @@ describe("standalone recipes", () => {
       ui: "nativewind",
     });
     const directory = createProjectDirectory("mobile");
-    applyProjectStructure(config, directory);
+    applyProjectStructure(configuration, directory);
 
-    const result = applyRecipes(config, directory);
+    const result = applyRecipes(configuration, directory);
     expect(result.ok).toBe(true);
     expect(existsSync(join(directory, "src/features/authorization"))).toBe(false);
     expect(existsSync(join(directory, "src/integrations/auth"))).toBe(false);
@@ -131,7 +131,7 @@ describe("standalone recipes", () => {
 
 describe("monorepo recipes", () => {
   it("exports direct module paths without package barrels", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       topology: "monorepo",
       apps: ["web", "mobile"],
@@ -141,11 +141,11 @@ describe("monorepo recipes", () => {
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
     const directory = createProjectDirectory("monorepo-direct-imports");
-    applyProjectStructure(config, directory);
+    applyProjectStructure(configuration, directory);
     mkdirSync(join(directory, "apps/mobile"), { recursive: true });
     writeFileSync(join(directory, "apps/mobile/package.json"), '{"name":"mobile"}\n');
 
-    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(applyRecipes(configuration, directory).ok).toBe(true);
     const mobileManifest = JSON.parse(
       readFileSync(join(directory, "apps/mobile/package.json"), "utf-8"),
     ) as { devDependencies: Record<string, string> };
@@ -154,11 +154,11 @@ describe("monorepo recipes", () => {
       "^7.29.7",
     );
     for (const packageName of ["core", "adapters-next", "adapters-expo"]) {
-      const packageDir = join(directory, "packages", packageName);
-      const manifest = JSON.parse(readFileSync(join(packageDir, "package.json"), "utf-8")) as {
+      const packageDirectory = join(directory, "packages", packageName);
+      const manifest = JSON.parse(readFileSync(join(packageDirectory, "package.json"), "utf-8")) as {
         exports: Record<string, string>;
       };
-      expect(existsSync(join(packageDir, "src/index.ts"))).toBe(false);
+      expect(existsSync(join(packageDirectory, "src/index.ts"))).toBe(false);
       expect(manifest.exports["."]).toBeUndefined();
       expect(manifest.exports["./backend/*"]).toBe("./src/backend/*.ts");
     }
@@ -173,7 +173,7 @@ describe("monorepo recipes", () => {
 
 describe("Convex recipes", () => {
   it("generates web providers and server access without the optional example", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       backend: "convex",
       topology: "web",
@@ -182,9 +182,9 @@ describe("Convex recipes", () => {
       ui: "shadcn-base-ui",
     });
     const directory = createProjectDirectory("convex-web");
-    applyProjectStructure(config, directory);
+    applyProjectStructure(configuration, directory);
 
-    expect(applyRecipes(config, directory)).toEqual(expect.objectContaining({ ok: true }));
+    expect(applyRecipes(configuration, directory)).toEqual(expect.objectContaining({ ok: true }));
     expect(existsSync(join(directory, "convex/schema.ts"))).toBe(true);
     expect(existsSync(join(directory, "convex/_generated/api.d.ts"))).toBe(true);
     expect(existsSync(join(directory, "src/integrations/convex/server.ts"))).toBe(true);
@@ -199,7 +199,7 @@ describe("Convex recipes", () => {
   });
 
   it("generates an Expo Go public task example on a separate route", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       backend: "convex",
       convexExample: true,
@@ -210,9 +210,9 @@ describe("Convex recipes", () => {
       ui: "nativewind",
     });
     const directory = createProjectDirectory("convex-mobile");
-    applyProjectStructure(config, directory);
+    applyProjectStructure(configuration, directory);
 
-    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(applyRecipes(configuration, directory).ok).toBe(true);
     expect(existsSync(join(directory, "src/app/example.tsx"))).toBe(true);
     expect(existsSync(join(directory, "src/app/sign-in.tsx"))).toBe(false);
     expect(readFileSync(join(directory, "src/app/index.tsx"), "utf-8")).toContain("/example");
@@ -222,7 +222,7 @@ describe("Convex recipes", () => {
   });
 
   it("shares one Clerk-protected backend across monorepo apps", () => {
-    const config = parseProjectConfig({
+    const configuration = parseProjectConfiguration({
       ...base,
       backend: "convex",
       convexExample: true,
@@ -234,9 +234,9 @@ describe("Convex recipes", () => {
       ui: { web: "shadcn-base-ui", mobile: "nativewind" },
     });
     const directory = createProjectDirectory("convex-monorepo");
-    applyProjectStructure(config, directory);
+    applyProjectStructure(configuration, directory);
 
-    expect(applyRecipes(config, directory).ok).toBe(true);
+    expect(applyRecipes(configuration, directory).ok).toBe(true);
     expect(existsSync(join(directory, "packages/convex/convex/auth.config.ts"))).toBe(true);
     expect(existsSync(join(directory, "packages/convex/convex/tasks.ts"))).toBe(true);
     expect(existsSync(join(directory, "apps/web/src/app/example/page.tsx"))).toBe(true);

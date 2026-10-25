@@ -21,15 +21,15 @@ export const authenticationSchema = z.enum(
   optionValues(SUPPORTED_OPTIONS.authentication),
 );
 /** Translation integrations supported by web applications. */
-export const webInternationalizationSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webI18n));
+export const webInternationalizationSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webInternationalization));
 /** Translation integrations supported by mobile applications. */
 export const mobileInternationalizationSchema = z.enum(
-  optionValues(SUPPORTED_OPTIONS.mobileI18n),
+  optionValues(SUPPORTED_OPTIONS.mobileInternationalization),
 );
 /** User interface integrations supported by web applications. */
-export const webUserInterfaceSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webUi));
+export const webUserInterfaceSchema = z.enum(optionValues(SUPPORTED_OPTIONS.webUserInterface));
 /** User interface integrations supported by mobile applications. */
-export const mobileUserInterfaceSchema = z.enum(optionValues(SUPPORTED_OPTIONS.mobileUi));
+export const mobileUserInterfaceSchema = z.enum(optionValues(SUPPORTED_OPTIONS.mobileUserInterface));
 /** Expo runtimes supported by mobile scaffolding. */
 export const expoRuntimeSchema = z.enum(
   optionValues(SUPPORTED_OPTIONS.runtimes),
@@ -53,7 +53,7 @@ const internationalizationInputSchema = z.union([webInternationalizationSchema, 
 const userInterfaceInputSchema = z.union([webUserInterfaceSchema, mobileUserInterfaceSchema, userInterfaceStackSchema]);
 
 /** Validates supported scaffold choices and their cross-platform constraints. */
-export const projectConfigSchema = z
+export const projectConfigurationSchema = z
   .object({
     $schema: z.string().optional(),
     name: z
@@ -75,8 +75,8 @@ export const projectConfigSchema = z
     runtime: expoRuntimeSchema.optional(),
   })
   .strict()
-  .superRefine((config, context) => {
-    if (config.convexExample && config.backend !== "convex") {
+  .superRefine((configuration, context) => {
+    if (configuration.convexExample && configuration.backend !== "convex") {
       context.addIssue({
         code: "custom",
         message: "convexExample requires the Convex backend",
@@ -85,11 +85,11 @@ export const projectConfigSchema = z
     }
 
     if (
-      config.topology === "monorepo" &&
-      config.apps !== undefined &&
-      (config.apps.length !== 2 ||
-        !config.apps.includes("web") ||
-        !config.apps.includes("mobile"))
+      configuration.topology === "monorepo" &&
+      configuration.apps !== undefined &&
+      (configuration.apps.length !== 2 ||
+        !configuration.apps.includes("web") ||
+        !configuration.apps.includes("mobile"))
     ) {
       context.addIssue({
         code: "custom",
@@ -98,7 +98,7 @@ export const projectConfigSchema = z
       });
     }
 
-    if (config.topology !== "monorepo" && config.apps !== undefined) {
+    if (configuration.topology !== "monorepo" && configuration.apps !== undefined) {
       context.addIssue({
         code: "custom",
         message: "apps[] is only valid for monorepo topology",
@@ -106,7 +106,7 @@ export const projectConfigSchema = z
       });
     }
 
-    if (config.defaultLocale && !config.locales.includes(config.defaultLocale)) {
+    if (configuration.defaultLocale && !configuration.locales.includes(configuration.defaultLocale)) {
       context.addIssue({
         code: "custom",
         message: "defaultLocale must be included in locales[]",
@@ -115,8 +115,8 @@ export const projectConfigSchema = z
     }
 
     const hasMobile =
-      config.topology === "mobile" || config.topology === "monorepo";
-    if (hasMobile && !config.runtime) {
+      configuration.topology === "mobile" || configuration.topology === "monorepo";
+    if (hasMobile && !configuration.runtime) {
       context.addIssue({
         code: "custom",
         message: "mobile projects require runtime (expo-go | dev-build)",
@@ -125,8 +125,8 @@ export const projectConfigSchema = z
     }
 
     const mobileInternationalization =
-      typeof config.i18n === "object" ? config.i18n.mobile : config.i18n;
-    if (hasMobile && config.runtime === "expo-go" && mobileInternationalization !== "none") {
+      typeof configuration.i18n === "object" ? configuration.i18n.mobile : configuration.i18n;
+    if (hasMobile && configuration.runtime === "expo-go" && mobileInternationalization !== "none") {
       context.addIssue({
         code: "custom",
         message: "Expo Go currently requires mobile i18n to be none",
@@ -135,7 +135,7 @@ export const projectConfigSchema = z
     }
     if (
       hasMobile &&
-      config.runtime === "dev-build" &&
+      configuration.runtime === "dev-build" &&
       mobileInternationalization !== "gt-react-native"
     ) {
       context.addIssue({
@@ -147,7 +147,7 @@ export const projectConfigSchema = z
   });
 
 /** Validated scaffold choices with defaults applied. */
-export type ProjectConfig = z.infer<typeof projectConfigSchema>;
+export type ProjectConfiguration = z.infer<typeof projectConfigurationSchema>;
 /** Package manager selected for scaffolding and dependency installation. */
 export type PackageManager = z.infer<typeof packageManagerSchema>;
 /** Layout of the generated standalone application or monorepo. */
@@ -188,59 +188,59 @@ export type ProjectStacks = {
 };
 
 /** Scaffold choices resolved into application-specific integration settings. */
-export type NormalizedProjectConfig = Omit<ProjectConfig, "apps" | "i18n" | "ui"> & {
+export type NormalizedProjectConfiguration = Omit<ProjectConfiguration, "apps" | "i18n" | "ui"> & {
   apps: App[];
   i18n: NormalizedInternationalization;
   ui: NormalizedUserInterface;
   stacks: ProjectStacks;
 };
 
-function resolveApps(config: ProjectConfig): App[] {
-  if (config.topology === "web") {
+function resolveApps(configuration: ProjectConfiguration): App[] {
+  if (configuration.topology === "web") {
     return ["web"];
   }
-  if (config.topology === "mobile") {
+  if (configuration.topology === "mobile") {
     return ["mobile"];
   }
   return ["web", "mobile"];
 }
 
-function normalizeInternationalization(config: ProjectConfig, apps: App[]): NormalizedInternationalization {
-  if (typeof config.i18n === "string") {
-    if (config.topology === "web") {
-      return { web: config.i18n as WebInternationalization };
+function normalizeInternationalization(configuration: ProjectConfiguration, apps: App[]): NormalizedInternationalization {
+  if (typeof configuration.i18n === "string") {
+    if (configuration.topology === "web") {
+      return { web: configuration.i18n as WebInternationalization };
     }
-    return { mobile: config.i18n as MobileInternationalization };
+    return { mobile: configuration.i18n as MobileInternationalization };
   }
 
   return {
-    web: apps.includes("web") ? config.i18n.web : undefined,
-    mobile: apps.includes("mobile") ? config.i18n.mobile : undefined,
+    web: apps.includes("web") ? configuration.i18n.web : undefined,
+    mobile: apps.includes("mobile") ? configuration.i18n.mobile : undefined,
   };
 }
 
-function normalizeUserInterface(config: ProjectConfig, apps: App[]): NormalizedUserInterface {
-  if (typeof config.ui === "string") {
-    if (config.topology === "web") {
-      return { web: config.ui as WebUserInterface };
+function normalizeUserInterface(configuration: ProjectConfiguration, apps: App[]): NormalizedUserInterface {
+  if (typeof configuration.ui === "string") {
+    if (configuration.topology === "web") {
+      return { web: configuration.ui as WebUserInterface };
     }
-    return { mobile: config.ui as MobileUserInterface };
+    return { mobile: configuration.ui as MobileUserInterface };
   }
 
   return {
-    web: apps.includes("web") ? config.ui.web : undefined,
-    mobile: apps.includes("mobile") ? config.ui.mobile : undefined,
+    web: apps.includes("web") ? configuration.ui.web : undefined,
+    mobile: apps.includes("mobile") ? configuration.ui.mobile : undefined,
   };
 }
 
 /** Resolves shared scaffold settings into the selected application stacks. */
-export function normalizeProjectConfig(config: ProjectConfig): NormalizedProjectConfig {
-  const apps = resolveApps(config);
-  const internationalization = normalizeInternationalization(config, apps);
-  const userInterface = normalizeUserInterface(config, apps);
+export function normalizeProjectConfiguration(configuration: ProjectConfiguration): NormalizedProjectConfiguration {
+  const apps = resolveApps(configuration);
+  const internationalization = normalizeInternationalization(configuration, apps);
+  const userInterface = normalizeUserInterface(configuration, apps);
 
   return {
-    ...config,
+    ...configuration,
     apps,
     i18n: internationalization,
     ui: userInterface,
@@ -252,13 +252,13 @@ export function normalizeProjectConfig(config: ProjectConfig): NormalizedProject
 }
 
 /** Validates scaffold input and resolves platform-specific defaults. */
-export function parseProjectConfig(input: unknown): NormalizedProjectConfig {
-  return normalizeProjectConfig(projectConfigSchema.parse(input));
+export function parseProjectConfiguration(input: unknown): NormalizedProjectConfiguration {
+  return normalizeProjectConfiguration(projectConfigurationSchema.parse(input));
 }
 
 /** Describes accepted scaffold input for JSON-aware editors and tooling. */
-export function projectConfigJsonSchema(): Record<string, unknown> {
-  return toJSONSchema(projectConfigSchema, {
+export function projectConfigurationJsonSchema(): Record<string, unknown> {
+  return toJSONSchema(projectConfigurationSchema, {
     target: "draft-2020-12",
     io: "input",
     reused: "inline",
@@ -266,8 +266,8 @@ export function projectConfigJsonSchema(): Record<string, unknown> {
 }
 
 /** Loads and validates scaffold choices from a JSON input file. */
-export function loadProjectConfigFromFile(configPath: string): NormalizedProjectConfig {
-  const absolutePath = path.resolve(configPath);
+export function loadProjectConfigurationFromFile(configurationPath: string): NormalizedProjectConfiguration {
+  const absolutePath = path.resolve(configurationPath);
   const contents = readFileSync(absolutePath, "utf-8");
-  return parseProjectConfig(JSON.parse(contents) as unknown);
+  return parseProjectConfiguration(JSON.parse(contents) as unknown);
 }
