@@ -240,3 +240,191 @@ test("published assets include the single canonical rules and portable checker",
   assert.ok(manifest.files.includes("scripts/check-code-standards.mjs"));
   assert.equal(readFileSync(join(repository, "CLAUDE.md"), "utf8").trim(), "@AGENTS.md");
 });
+
+test("AR1 scans projects under excluded ancestor names and a project itself named build", () => {
+  const projects = ["build/project", "out/project", "dist/project", "build"];
+  const files = {};
+  for (const project of projects) {
+    files[`${project}/api.ts`] = "export function undocumented() {}";
+    files[`${project}/src/_generated/api.ts`] = "export function maintained() {}";
+    for (const child of ["build", "out", "dist", "node_modules", "convex/_generated"]) {
+      files[`${project}/${child}/ignored.ts`] = "export function ignored() {}";
+    }
+  }
+  withProject(files, (directory) => {
+    for (const project of projects) {
+      const result = spawnSync(process.execPath, [checkerPath, "."], {
+        cwd: join(directory, project), encoding: "utf8",
+      });
+      assert.equal(result.status, 1, `${project}: ${result.stdout}${result.stderr}`);
+      assert.match(result.stdout, /Missing intent documentation for undocumented/);
+      assert.match(result.stdout, /Missing intent documentation for maintained/);
+      assert.doesNotMatch(result.stdout, /for ignored/);
+    }
+  });
+});
+
+test("AR1 excludes linked generated ownership while retaining maintained links and cycles", () => {
+  withProject({
+    "build/output.ts": "export function ignored() {}",
+    "convex/_generated/api.ts": "export function ignored() {}",
+    "src/_generated/api.ts": "export function maintained() {}",
+  }, (directory) => {
+    symlinkSync(join(directory, "build"), join(directory, "output-link"), "junction");
+    symlinkSync(join(directory, "convex/_generated"), join(directory, "convex-link"), "junction");
+    symlinkSync(directory, join(directory, "src/loop"), "junction");
+    const diagnostics = checkCodeStandards([directory]);
+    assert.equal(diagnostics.length, 1);
+    assert.match(diagnostics[0].message, /for maintained/);
+  });
+});
+
+test("AR2 rejects named imported aliases and exported forwarded bindings through the CLI", () => {
+  withProject({
+    "source.ts": "/** Send requests. */ export function send() {}",
+    "named.ts": 'import { send } from "./source.js"; /** Send requests. */ const alias = send; export { alias };',
+    "binding.ts": 'import { send } from "./source.js"; /** Send requests. */ export const alias = send;',
+    "chain.ts": 'import * as api from "./source.js"; const first = api.send; /** Send requests. */ const second = (first satisfies typeof first); export { second as send };',
+    "destructured.ts": 'import * as api from "./source.js"; /** Send requests. */ export const { send } = api;',
+  }, (directory) => {
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    for (const name of ["named", "binding", "chain", "destructured"]) {
+      assert.match(result.stdout, new RegExp(`${name}\\.ts:.*error \\[barrel\\]`));
+    }
+  });
+});
+
+test("AR2 accepts documented new wrapper and factory operations", () => {
+  withProject({
+    "source.ts": "/** Send requests. */ export function send() {} /** Create a sender. */ export function factory() { return () => {}; }",
+    "api.ts": `import { send, factory } from "./source.js";
+      /** Send a normalized request. */ export function forward() { return send(); }
+      /** Schedule a request. */ const schedule = () => send(); export { schedule };
+      /** Execute a request. */ export const execute = factory();`,
+  }, (directory) => {
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  });
+});
+
+test("AR3 uses nearest extended workspace configurations without suppressing excluded maintained files", () => {
+  const files = {
+    "tsconfig.json": JSON.stringify({ compilerOptions: { paths: { "@/*": ["./root/*"] } } }),
+    "root/local.ts": "/** Create an ordinary value. */ export function factory() { return 1; }",
+    "configuration/base.json": JSON.stringify({ compilerOptions: { moduleResolution: "bundler", module: "esnext", strict: true } }),
+  };
+  for (const project of ["apps/web", "packages/core"]) {
+    files[`${project}/tsconfig.json`] = JSON.stringify({
+      extends: "../../configuration/base.json",
+      compilerOptions: { paths: { "@/*": ["./src/*"] } },
+      include: ["src/**/*.ts"], exclude: ["tests", "scripts", "configuration.ts"],
+    });
+    files[`${project}/src/local.ts`] = "/** Create a request operation. */ export function factory() { return () => {}; }";
+    for (const path of ["src/public.ts", "tests/api.ts", "scripts/api.ts", "configuration.ts"]) {
+      files[`${project}/${path}`] = 'import { factory } from "@/local"; export const execute = factory();';
+    }
+  }
+  files["root/public.ts"] = 'import { factory } from "@/local"; export const value = factory();';
+  withProject(files, (directory) => {
+    const diagnostics = checkCodeStandards([directory]);
+    assert.equal(diagnostics.filter((diagnostic) => diagnostic.rule === "public-documentation").length, 8);
+    assert.ok(!diagnostics.some((diagnostic) => diagnostic.file === join(directory, "root/public.ts")));
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /Missing intent documentation for execute/);
+  });
+});
+
+test("AR3 surfaces malformed configuration and unresolved configured aliases", () => {
+  withProject({
+    "malformed/tsconfig.json": '{"compilerOptions":{"strict": "yes"}}',
+    "malformed/api.ts": "/** Send requests. */ export function send() {}",
+    "missing-extends/tsconfig.json": '{"extends":"./absent.json"}',
+    "missing-extends/api.ts": "/** Send requests. */ export function send() {}",
+    "unresolved/tsconfig.json": '{"compilerOptions":{"paths":{"@/*":["./src/*"]}}}',
+    "unresolved/api.ts": 'import { factory } from "@/absent"; export const execute = factory();',
+  }, (directory) => {
+    for (const project of ["malformed", "missing-extends", "unresolved"]) {
+      const result = spawnSync(process.execPath, [checkerPath, "."], {
+        cwd: join(directory, project), encoding: "utf8",
+      });
+      assert.equal(result.status, 1, `${project}: ${result.stdout}${result.stderr}`);
+      assert.match(result.stdout + result.stderr, /strict|absent/);
+    }
+  });
+});
+
+test("AR4 checks locally inherited interface and class callable members across files", () => {
+  withProject({
+    "internal.ts": `export interface Internal { send(): void; receive: () => void; }
+      /** Store internal requests. */ export class InternalStore {
+        send() {} receive = () => {}; private hidden() {} protected internal() {} #secret() {}
+      }`,
+    "api.ts": `import { Internal, InternalStore } from "./internal.js";
+      interface Local { local(): void; }
+      class LocalStore { enqueue() {} dequeue = () => {}; private hidden() {} protected internal() {} }
+      export interface Public extends Local, Internal {}
+      /** Store public requests. */ export class PublicStore extends InternalStore {}
+      /** Store queued requests. */ export class Queue extends LocalStore {}`,
+  }, (directory) => {
+    const diagnostics = checkCodeStandards([join(directory, "api.ts"), join(directory, "internal.ts")]);
+    for (const name of ["send", "receive", "local", "enqueue", "dequeue"]) {
+      assert.ok(diagnostics.some((diagnostic) => diagnostic.message === `Missing intent documentation for ${name}.`), name);
+    }
+    assert.ok(!diagnostics.some((diagnostic) => /hidden|internal|secret/.test(diagnostic.message)));
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /for local/);
+  });
+});
+
+test("AR3 parses invalid JSON and still scans files outside every configured input", () => {
+  withProject({
+    "malformed/tsconfig.json": '{"compilerOptions": {',
+    "malformed/api.ts": "/** Send requests. */ export function send() {}",
+    "empty-files/tsconfig.json": '{"files":[]}',
+    "empty-files/api.ts": "export function send() {}",
+    "excluded/tsconfig.json": '{"compilerOptions":{"paths":{"@/*":["./src/*"]}},"include":["absent/**/*.ts"]}',
+    "excluded/src/local.ts": "/** Create an operation. */ export function factory() { return () => {}; }",
+    "excluded/scripts/api.ts": 'import { factory } from "@/local"; export const execute = factory();',
+  }, (directory) => {
+    const malformed = spawnSync(process.execPath, [checkerPath, "."], {
+      cwd: join(directory, "malformed"), encoding: "utf8",
+    });
+    assert.equal(malformed.status, 1, malformed.stdout + malformed.stderr);
+    assert.match(malformed.stderr, /tsconfig\.json/);
+    const emptyFiles = spawnSync(process.execPath, [checkerPath, "."], {
+      cwd: join(directory, "empty-files"), encoding: "utf8",
+    });
+    assert.equal(emptyFiles.status, 1, emptyFiles.stdout + emptyFiles.stderr);
+    assert.match(emptyFiles.stdout, /Missing intent documentation for send/);
+    const excluded = spawnSync(process.execPath, [checkerPath, "."], {
+      cwd: join(directory, "excluded"), encoding: "utf8",
+    });
+    assert.equal(excluded.status, 1, excluded.stdout + excluded.stderr);
+    assert.match(excluded.stdout, /Missing intent documentation for execute/);
+    writeFileSync(join(directory, "excluded/scripts/api.ts"), `import { factory } from "@/local";
+      export type Path = "@/literal";
+      /** Execute requests. */ export const execute = factory();`);
+    const documented = spawnSync(process.execPath, [checkerPath, "."], {
+      cwd: join(directory, "excluded"), encoding: "utf8",
+    });
+    assert.equal(documented.status, 0, documented.stdout + documented.stderr);
+  });
+});
+
+test("AR4 accepts documented local inheritance and exempts dependency methods", () => {
+  withProject({
+    "node_modules/external/index.d.ts": "export interface Remote { send(): void; } export class RemoteStore { send(): void; }",
+    "api.ts": `import { Remote, RemoteStore } from "external";
+      interface Internal { /** Send pending requests. */ send(): void; }
+      export interface Public extends Internal, Remote {}
+      /** Store requests. */ class InternalStore { /** Receive pending requests. */ receive() {} private hidden() {} protected internal() {} }
+      /** Store public requests. */ export class PublicStore extends InternalStore {}
+      /** Store remote requests. */ export class PublicRemoteStore extends RemoteStore {}`,
+  }, (directory) => {
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  });
+});
