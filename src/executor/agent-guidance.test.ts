@@ -83,4 +83,56 @@ describe("agent guidance", () => {
       expect(readFileSync(join(target, "CLAUDE.md"), "utf-8")).toBe(result);
     },
   );
+
+  it.each([
+    ["Example:\n\n    @AGENTS.md\n", "\n@AGENTS.md\n"],
+    ["Example:\r\n\r\n\t@AGENTS.md\r\n", "\r\n@AGENTS.md\r\n"],
+    ["<!-- Framework example is unfinished", "\n\n-->\n\n@AGENTS.md\n"],
+    ["<!-- Read @AGENTS.md for example", "\n\n-->\n\n@AGENTS.md\n"],
+    ["<!-- example\r\n```md\r\n@AGENTS.md", "\r\n\r\n-->\r\n\r\n@AGENTS.md\r\n"],
+    ["```md\n<!-- @AGENTS.md", "\n\n```\n\n@AGENTS.md\n"],
+    ["    <!-- @AGENTS.md\n\n<!-- unfinished", "\n\n-->\n\n@AGENTS.md\n"],
+    ["<!-- closed -->\n\n    @AGENTS.md", "\n\n@AGENTS.md\n"],
+    ["`<!--`\n\n    @AGENTS.md", "\n\n@AGENTS.md\n"],
+    ["`Example:\n@AGENTS.md`", "\n\n@AGENTS.md\n"],
+    ["<!-- ` --> `@AGENTS.md`", "\n\n@AGENTS.md\n"],
+    ["# Example\n    @AGENTS.md", "\n\n@AGENTS.md\n"],
+    ["Example\n=======\n    @AGENTS.md", "\n\n@AGENTS.md\n"],
+    ["# Règles 🧭\r\n\r\n    @AGENTS.md\r\n", "\r\n@AGENTS.md\r\n"],
+  ])("preserves literal bytes and appends outside their region: %j", (original, appended) => {
+    assets.directory = temporaryDirectory();
+    const target = temporaryDirectory();
+    const claudePath = join(target, "CLAUDE.md");
+    writeFileSync(join(assets.directory, "AGENTS.md"), "Rules");
+    const originalBytes = Buffer.from(original, "utf-8");
+    writeFileSync(claudePath, originalBytes);
+
+    emitAgentGuidance(target);
+
+    const result = readFileSync(claudePath);
+    expect(result.subarray(0, originalBytes.length)).toEqual(originalBytes);
+    expect(result).toEqual(Buffer.from(original + appended, "utf-8"));
+    emitAgentGuidance(target);
+    expect(readFileSync(claudePath)).toEqual(result);
+  });
+
+  it.each([
+    "<!-- closed --> Read @AGENTS.md\n<!-- unfinished",
+    "Example:\n\n    @AGENTS.md\n\nRead @AGENTS.md\n",
+    "```md\n<!-- @AGENTS.md\n```\nRead @AGENTS.md\n",
+    "<!-- example\n```\n-->\nRead @AGENTS.md\n",
+    "Paragraph\n    @AGENTS.md\n",
+    "<!-- ` --> Read @AGENTS.md `\n",
+    "`Example:\n<!--`\nRead @AGENTS.md\n",
+  ])("preserves active imports alongside literal regions byte for byte: %j", (original) => {
+    assets.directory = temporaryDirectory();
+    const target = temporaryDirectory();
+    const claudePath = join(target, "CLAUDE.md");
+    writeFileSync(join(assets.directory, "AGENTS.md"), "Rules");
+    const originalBytes = Buffer.from(original, "utf-8");
+    writeFileSync(claudePath, originalBytes);
+    emitAgentGuidance(target);
+    emitAgentGuidance(target);
+    expect(readFileSync(claudePath)).toEqual(originalBytes);
+  });
 });
