@@ -37,6 +37,50 @@ function createTemporaryDirectory(): string {
 }
 
 describe("runBootstrapPhase", () => {
+  it.each([
+    { topology: "mobile", enabled: false },
+    { topology: "mobile", enabled: true },
+    { topology: "monorepo", enabled: false },
+    { topology: "monorepo", enabled: true },
+  ] as const)("prepares $topology tab refs after install with enforcement $enabled", async ({ topology, enabled }) => {
+    const directory = createTemporaryDirectory();
+    const mobileDirectory = topology === "monorepo" ? join(directory, "apps/mobile") : directory;
+    const filePath = join(mobileDirectory, "src/components/app-tabs.web.tsx");
+    const original = `import { TabTriggerSlotProps } from 'expo-router/ui';
+import { Pressable } from 'react-native';
+export function TabButton({ children, isFocused, ...props }: TabTriggerSlotProps) {
+  return (<Pressable {...props}><Text selected={isFocused}>{children}</Text></Pressable>);
+}
+`;
+    const progress: string[] = [];
+    const configuration: NormalizedProjectConfiguration = {
+      ...webConfiguration, topology, apps: topology === "monorepo" ? ["web", "mobile"] : ["mobile"],
+      auth: "none", runtime: "expo-go", enforceCodeStandards: enabled,
+      i18n: { mobile: "none" }, ui: { mobile: "nativewind" },
+      stacks: { hasWeb: topology === "monorepo", hasMobile: true },
+    };
+    const result = await runBootstrapPhase(configuration, directory, {
+      simulateBootstrapOutput: true,
+      starterCompiler: ts,
+      onProgress: (event) => progress.push(`${event.status}:${event.id}`),
+      bootstrapRunner: async (step) => {
+        if (step.id === "bootstrap-mobile" || step.id === "bootstrap-apps-mobile") {
+          mkdirSync(join(mobileDirectory, "src/components"), { recursive: true });
+          writeFileSync(filePath, original);
+        }
+        if (step.id === "install-root") expect(readFileSync(filePath, "utf-8")).toBe(original);
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+    });
+    expect(result).toMatchObject({ ok: true, appliedRecipes: expect.arrayContaining(["expo-starter-ref"]) });
+    const corrected = readFileSync(filePath, "utf-8");
+    expect(corrected).toContain('Omit<TabTriggerSlotProps, "ref"> & Pick<import("react").ComponentProps<typeof Pressable>, "ref">');
+    expect(corrected).toContain("/** Displays a navigation tab and its focused state. */");
+    expect(progress.indexOf("start:expo-starter-ref")).toBeGreaterThan(progress.indexOf("complete:install-root"));
+    expect(progress).toContain("complete:expo-starter-ref");
+    expect(existsSync(join(directory, "tools/check-code-standards.mjs"))).toBe(enabled);
+  });
+
   it.each([false, true])("retains Expo framework rules and hydration compatibility with enforcement %j", async (enabled) => {
     const directory = createTemporaryDirectory();
     const originalConfiguration = 'module.exports = [{ rules: { "no-console": "error" } }];\r\n';

@@ -120,6 +120,11 @@ export function resolveRecipePlan(configuration: NormalizedProjectConfiguration)
   });
   if (configuration.stacks.hasMobile) {
     steps.push({
+      id: "expo-starter-ref",
+      phase: "install",
+      description: "Align Expo starter tab refs with React Native",
+    });
+    steps.push({
       id: "expo-starter-lint",
       phase: "install",
       description: "Preserve framework ESLint configuration and Expo starter hydration compatibility",

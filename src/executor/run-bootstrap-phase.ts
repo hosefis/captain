@@ -14,6 +14,7 @@ import { applyProjectStructure } from "./project-structure.js";
 import { resolvePackageManagerDriver } from "./package-manager.js";
 import { documentStarterSource, findStarterSourceFiles } from "./starter-documentation.js";
 import { applyExpoStarterLintCompatibility } from "./expo-lint-compatibility.js";
+import { applyExpoStarterRefCompatibility } from "./expo-starter-ref-compatibility.js";
 
 /** Outcome of framework scaffolding, integration generation, and dependency installation. */
 export type BootstrapPhaseResult =
@@ -274,9 +275,18 @@ export async function runBootstrapPhase(
   }
 
   if (configuration.stacks.hasMobile) {
+    const mobileDirectory = configuration.topology === "monorepo" ? join(targetDirectory, "apps/mobile") : targetDirectory;
+    try {
+      options.onProgress?.({ status: "start", id: "expo-starter-ref", description: "Align Expo starter tab refs with React Native" });
+      applyExpoStarterRefCompatibility(mobileDirectory, starterSourceFiles, options.starterCompiler);
+      options.onProgress?.({ status: "complete", id: "expo-starter-ref", description: "Aligned Expo starter tab refs with React Native" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Expo starter ref compatibility failed";
+      return { ok: false, phase: "recipes", message: `Expo starter ref compatibility failed: ${message}` };
+    }
+
     try {
       options.onProgress?.({ status: "start", id: "expo-starter-lint", description: "Preserve Expo starter lint compatibility" });
-      const mobileDirectory = configuration.topology === "monorepo" ? join(targetDirectory, "apps/mobile") : targetDirectory;
       applyExpoStarterLintCompatibility(mobileDirectory, options.starterCompiler);
       options.onProgress?.({ status: "complete", id: "expo-starter-lint", description: "Preserved Expo starter lint compatibility" });
     } catch (error) {
@@ -298,7 +308,7 @@ export async function runBootstrapPhase(
       "agent-guidance",
       ...recipesResult.appliedRecipes,
       "starter-documentation",
-      ...(configuration.stacks.hasMobile ? ["expo-starter-lint"] : []),
+      ...(configuration.stacks.hasMobile ? ["expo-starter-ref", "expo-starter-lint"] : []),
     ],
   };
 }

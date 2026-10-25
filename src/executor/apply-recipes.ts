@@ -547,6 +547,7 @@ const WORKSPACE_CONFIGURATION_STEPS = new Set([
   "env-example",
   "agent-guidance",
   "starter-documentation",
+  "expo-starter-ref",
   "expo-starter-lint",
 ]);
 
