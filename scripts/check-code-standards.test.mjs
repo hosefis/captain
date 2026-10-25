@@ -428,3 +428,84 @@ test("AR4 accepts documented local inheritance and exempts dependency methods", 
     assert.equal(result.status, 0, result.stdout + result.stderr);
   });
 });
+
+test("AR7 rejects pure imported type forwarding through aliases and local export lists", () => {
+  withProject({
+    "source.ts": "export interface Request { readonly id: string; }",
+    "forward.ts": 'import type { Request } from "./source.js"; export type PublicRequest = Request;',
+    "chain.ts": 'import type { Request } from "./source.js"; type First = Request; type Second = ((First)); export type { Second as PublicRequest };',
+    "exported-chain.ts": 'import type { Request } from "./source.js"; type First = Request; export type PublicRequest = (First);',
+    "namespace.ts": 'import type * as requests from "./source.js"; export type PublicRequest = requests.Request;',
+    "inline.ts": 'export type PublicRequest = import("./source.js").Request;',
+  }, (directory) => {
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    for (const name of ["forward", "chain", "exported-chain", "namespace", "inline"]) {
+      assert.match(result.stdout, new RegExp(`${name}\\.ts:.*error \\[barrel\\]`));
+    }
+  });
+});
+
+test("AR7 accepts composed local types, type operations and constructor applications", () => {
+  withProject({
+    "source.ts": `export interface Request { readonly id: string; }
+      export interface Envelope<Value> { value: Value; }
+      /** Send requests. */ export function send() {}`,
+    "api.ts": `import type { Request, Envelope } from "./source.js";
+      import { send } from "./source.js";
+      export interface PublicRequest { request: Request; }
+      export type Extended = Request & { createdAt: number };
+      export type OptionalRequest = Request | undefined;
+      export type RequestID = Request["id"];
+      export type Fields = keyof Request;
+      export type Snapshot = { [Key in keyof Request]: Request[Key] };
+      export type Transport = Envelope<Request>;
+      type Local = Readonly<Request>; export type { Local };
+      /** Describe the request sender. */ export type Sender = typeof send;
+      export type ExtractRequest<Value> = Value extends Envelope<infer Item> ? Item : never;`,
+    "cycle.ts": "type First = Second; type Second = First; export type { First };",
+  }, (directory) => {
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  });
+});
+
+test("AR8 requires documentation for locally inherited public static callables", () => {
+  withProject({
+    "api.ts": `class Internal {
+        static send() {} static receive = () => {};
+        private static hidden() {} protected static internal() {} static #secret() {}
+      }
+      /** Store requests. */ export class Public extends Internal {}`,
+  }, (directory) => {
+    const diagnostics = checkCodeStandards([directory]);
+    assert.equal(diagnostics.length, 2);
+    for (const name of ["send", "receive"]) {
+      assert.ok(diagnostics.some((diagnostic) => diagnostic.rule === "public-documentation" &&
+        diagnostic.message === `Missing intent documentation for ${name}.`), name);
+    }
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 1, result.stdout + result.stderr);
+    assert.match(result.stdout, /Missing intent documentation for send/);
+    assert.doesNotMatch(result.stdout, /for hidden|for internal|for #secret/);
+  });
+});
+
+test("AR8 accepts documented inherited statics and exempts dependency static APIs", () => {
+  withProject({
+    "node_modules/external/index.d.ts": "export class RemoteStore { static send(): void; static receive: () => void; }",
+    "api.ts": `import { RemoteStore } from "external";
+      class Internal {
+        /** Send requests. */ static send() {}
+        /** Receive requests. */ static receive = () => {};
+        /** Store a request. */ store() {}
+        private static hidden() {} protected static internal() {} static #secret() {}
+      }
+      /** Store requests. */ export class Public extends Internal {}
+      /** Store remote requests. */ export class PublicRemote extends RemoteStore {}
+      /** Store default requests. */ export default class extends Internal {}`,
+  }, (directory) => {
+    const result = spawnSync(process.execPath, [checkerPath, "."], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+  });
+});

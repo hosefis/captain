@@ -77,6 +77,12 @@ function isImportedBinding(node, checker, visited = new Set()) {
   if (!node || visited.has(node)) return false;
   visited.add(node);
   if (typescript.isCallExpression(node)) return node.expression.getText() === "require";
+  if (typescript.isTypeReferenceNode(node)) {
+    return !node.typeArguments?.length && isImportedBinding(node.typeName, checker, visited);
+  }
+  if (typescript.isParenthesizedTypeNode(node)) return isImportedBinding(node.type, checker, visited);
+  if (typescript.isQualifiedName(node)) return isImportedBinding(node.left, checker, visited);
+  if (typescript.isImportTypeNode(node)) return !node.isTypeOf && !!node.qualifier && !node.typeArguments?.length;
   if (typescript.isPropertyAccessExpression(node) || typescript.isElementAccessExpression(node) ||
       typescript.isParenthesizedExpression(node) || typescript.isAsExpression(node) ||
       typescript.isSatisfiesExpression(node) || typescript.isNonNullExpression(node)) {
@@ -87,6 +93,7 @@ function isImportedBinding(node, checker, visited = new Set()) {
     if (typescript.isImportSpecifier(declaration) || typescript.isImportClause(declaration) ||
         typescript.isNamespaceImport(declaration) || typescript.isImportEqualsDeclaration(declaration)) return true;
     if (typescript.isVariableDeclaration(declaration)) return isImportedBinding(declaration.initializer, checker, visited);
+    if (typescript.isTypeAliasDeclaration(declaration)) return isImportedBinding(declaration.type, checker, visited);
     if (!typescript.isBindingElement(declaration)) return false;
     let binding = declaration.parent;
     while (binding && !typescript.isVariableDeclaration(binding)) binding = binding.parent;
@@ -132,6 +139,12 @@ function inspectPublicDeclarations(source, checker, maintainedFiles, report) {
   const inspected = new Set();
   const reported = new Set();
 
+  function inspectProperties(value) {
+    for (const property of value.getProperties()) {
+      for (const declaration of property.declarations ?? []) inspect(declaration);
+    }
+  }
+
   function requireDocumentation(node, alternate) {
     if (hasIntentDocumentation(documentationOwner(node)) || hasIntentDocumentation(alternate)) return;
     if (hasReferencedIntentDocumentation(node, checker)) return;
@@ -168,9 +181,11 @@ function inspectPublicDeclarations(source, checker, maintainedFiles, report) {
     if (node.initializer) inspect(node.initializer, documentationOwner(node));
     if (typescript.isVariableDeclaration(node) || typescript.isCallExpression(node) ||
         typescript.isInterfaceDeclaration(node) || typescript.isClassLike(node)) {
-      for (const property of checker.getTypeAtLocation(node).getProperties()) {
-        for (const declaration of property.declarations ?? []) inspect(declaration);
-      }
+      inspectProperties(checker.getTypeAtLocation(node));
+    }
+    if (typescript.isClassLike(node)) {
+      const symbol = checker.getTypeAtLocation(node).getSymbol();
+      if (symbol) inspectProperties(checker.getTypeOfSymbolAtLocation(symbol, node));
     }
     if (typescript.isShorthandPropertyAssignment(node)) inspect(node.name, node);
     if (typescript.isParenthesizedExpression(node) || typescript.isAsExpression(node) ||
@@ -200,6 +215,11 @@ function inspectPublicDeclarations(source, checker, maintainedFiles, report) {
         typescript.getCombinedModifierFlags(node) & typescript.ModifierFlags.Export &&
         isImportedBinding(node.initializer, checker)) {
       report(node, "error", "barrel", "Import from the defining module instead of re-exporting an import.");
+    }
+    if (typescript.isTypeAliasDeclaration(node) &&
+        typescript.getCombinedModifierFlags(node) & typescript.ModifierFlags.Export &&
+        isImportedBinding(node.type, checker)) {
+      report(node, "error", "barrel", "Import from the defining module instead of forwarding an imported type.");
     }
     if (typescript.isExportAssignment(node)) {
       if (isImportedBinding(node.expression, checker)) {
