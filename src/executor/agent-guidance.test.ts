@@ -19,6 +19,52 @@ afterEach(() => {
 });
 
 describe("agent guidance", () => {
+  it.each([
+    ["Framework instructions\r\n<!-- code-standards:start -->\r\nUser's unfinished managed-section example\r\n", "\r\n"],
+    ["<!-- code-standards:start -->\nFirst example\n<!-- code-standards:start -->\nSecond example", "\n\n"],
+    ["<!-- code-standards:end -->\nOrphan end\n<!-- code-standards:start -->\nUnfinished example\n", "\n"],
+    ["<!-- code-standards:end -->\r\nKeep this orphan end", "\r\n\r\n"],
+    ["Règles 🧭\r\n<!-- code-standards:start -->\r\nKeep these Unicode bytes", "\r\n\r\n"],
+  ])("retains malformed existing bytes when appending and updating rules: %j", (original, separator) => {
+    assets.directory = temporaryDirectory();
+    const target = temporaryDirectory();
+    const guidancePath = join(target, "AGENTS.md");
+    const originalBytes = Buffer.from(original, "utf-8");
+    writeFileSync(guidancePath, originalBytes);
+
+    for (const canonical of ["First rules", "Updated rules\nSecond rule", "Final rules\r\n"]) {
+      writeFileSync(join(assets.directory, "AGENTS.md"), canonical);
+      emitAgentGuidance(target);
+      const result = readFileSync(guidancePath);
+      const section = `<!-- code-standards:start -->\n${canonical}${canonical.endsWith("\n") ? "" : "\n"}<!-- code-standards:end -->\n`;
+      expect(result.subarray(0, originalBytes.length)).toEqual(originalBytes);
+      expect(result).toEqual(Buffer.from(original + separator + section, "utf-8"));
+      emitAgentGuidance(target);
+      expect(readFileSync(guidancePath)).toEqual(result);
+    }
+  });
+
+  it.each([
+    ["Framework\r\n<!-- code-standards:start -->\r\nKeep the unfinished example\r\n", "\r\nCustom suffix without a terminal newline"],
+    ["<!-- code-standards:end -->\nOrphan end\n<!-- code-standards:start -->\nKeep this unfinished example\n", "\n<!-- code-standards:end -->\nKeep the extra end"],
+    ["<!-- code-standards:start -->\nFirst example\n<!-- code-standards:start -->\nSecond example\n", "\n<!-- code-standards:start -->\nKeep the unfinished suffix"],
+    ["Framework instructions\n", "\n<!-- code-standards:start -->\nSeparate section kept byte for byte\n<!-- code-standards:end -->\nUser suffix"],
+  ])("updates one complete section while preserving surrounding markers: %j", (prefix, suffix) => {
+    assets.directory = temporaryDirectory();
+    const target = temporaryDirectory();
+    const guidancePath = join(target, "AGENTS.md");
+    writeFileSync(guidancePath, `${prefix}<!-- code-standards:start -->\r\nOld rules\r\n<!-- code-standards:end -->${suffix}`);
+
+    for (const canonical of ["Current rules", "Replacement rules\nMore guidance"]) {
+      writeFileSync(join(assets.directory, "AGENTS.md"), canonical);
+      emitAgentGuidance(target);
+      const expected = Buffer.from(`${prefix}<!-- code-standards:start -->\n${canonical}\n<!-- code-standards:end -->${suffix}`, "utf-8");
+      expect(readFileSync(guidancePath)).toEqual(expected);
+      emitAgentGuidance(target);
+      expect(readFileSync(guidancePath)).toEqual(expected);
+    }
+  });
+
   it("replaces only its canonical section and preserves framework instructions on both sides", () => {
     assets.directory = temporaryDirectory();
     const target = temporaryDirectory();

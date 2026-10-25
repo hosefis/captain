@@ -15,6 +15,19 @@ function appendSection(contents: string, section: string): string {
   return `${contents}${separator}${section}`;
 }
 
+/** Pairs a closing marker with its nearest start, preserving earlier unmatched text. */
+function findManagedSection(contents: string): { start: number; end: number } | undefined {
+  let start = -1;
+  for (const marker of contents.matchAll(new RegExp(`${sectionStart}|${sectionEnd}`, "g"))) {
+    if (marker[0] === sectionStart) {
+      start = marker.index;
+      continue;
+    }
+    if (start >= 0) return { start, end: marker.index + sectionEnd.length };
+  }
+  return undefined;
+}
+
 function visibleProse(
   contents: string,
   start: number,
@@ -88,10 +101,9 @@ export function emitAgentGuidance(targetDirectory: string): void {
   const guidancePath = join(targetDirectory, "AGENTS.md");
   const existingGuidance = readExisting(guidancePath);
   const section = `${sectionStart}\n${canonical}${canonical.endsWith("\n") ? "" : "\n"}${sectionEnd}\n`;
-  const start = existingGuidance.indexOf(sectionStart);
-  const end = existingGuidance.indexOf(sectionEnd, start);
-  const guidance = start >= 0 && end >= start
-    ? `${existingGuidance.slice(0, start)}${section.trimEnd()}${existingGuidance.slice(end + sectionEnd.length)}`
+  const managedSection = findManagedSection(existingGuidance);
+  const guidance = managedSection
+    ? `${existingGuidance.slice(0, managedSection.start)}${section.trimEnd()}${existingGuidance.slice(managedSection.end)}`
     : appendSection(existingGuidance, section);
   writeFileSync(guidancePath, guidance, "utf-8");
 
