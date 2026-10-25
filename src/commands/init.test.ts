@@ -76,6 +76,7 @@ describe("runInit", () => {
       dryRun: true,
       json: false,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
     });
 
     expect(result.status).toBe("dry_run");
@@ -99,6 +100,7 @@ describe("runInit", () => {
       dryRun: true,
       json: false,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
     });
 
     expect(result.status).toBe("dry_run");
@@ -117,6 +119,7 @@ describe("runInit", () => {
       dryRun: true,
       json: false,
       verifyDocs: false,
+      packageManagerAvailability: allAvailable,
     });
 
     expect(result.status).toBe("validation_error");
@@ -130,6 +133,7 @@ describe("runInit", () => {
       dryRun: true,
       json: false,
       verifyDocs: true,
+      packageManagerAvailability: allAvailable,
       npmFetch: async (packageName) => ({
         ok: true,
         version:
@@ -160,6 +164,7 @@ describe("runInit", () => {
       dryRun: true,
       json: false,
       verifyDocs: true,
+      packageManagerAvailability: allAvailable,
       npmFetch: async (packageName) => ({
         ok: true,
         version: packageName === "create-next-app" ? "16.0.0" : "1.0.0",
