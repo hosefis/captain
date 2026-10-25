@@ -45,7 +45,8 @@ The wizard asks trajectory-changing questions first:
 6. Backend
 7. Compatible follow-up settings, including the optional Convex example
 8. Locales when internationalization is enabled
-9. Final configuration review
+9. Optional code standards enforcement (disabled by default)
+10. Final configuration review
 
 The wizard checks `pnpm --version`, `npm --version`, and `bun --version` and
 marks managers that cannot run as unavailable. It suggests the first available
@@ -80,7 +81,9 @@ src/
 ```
 
 The project root keeps framework configuration, dependency manifests, public
-assets, and generated CAPTAIN context files.
+assets, project documentation, and environment examples. Generated files use
+project and integration names without Captain branding. No scaffold configuration
+file is written to the project.
 
 ## Supported stack
 
@@ -105,6 +108,8 @@ integrations are tracked in [ROADMAP.md](ROADMAP.md).
 ## Config-file usage
 
 Use `--config` for repeatable or agent-driven generation:
+
+Create and maintain this input file separately; it is not emitted by scaffolding.
 
 ```bash
 create-captain my-app --config ./project.json --yes
@@ -217,7 +222,8 @@ JSON mode suppresses interactive progress and returns a single status envelope.
 
 Generated projects include:
 
-- `project.json` with the resolved configuration
+- `AGENTS.md` with canonical coding guidance, preserving framework instructions
+- `CLAUDE.md` importing `AGENTS.md`, preserving any existing instructions
 - `CONTEXT.md` with the generated stack and layout
 - `.env.example` containing only relevant integration variables
 
@@ -229,6 +235,34 @@ and production configuration.
 Generated shared modules use direct file imports. Monorepo packages expose
 module subpaths such as `@acme/core/backend/http-client` instead of root barrel
 exports.
+
+Every project receives the same coding guidance, including when enforcement is
+disabled. Existing framework guidance remains intact, and repeated generation
+synchronizes the canonical section without duplicating it. Claude imports the
+shared file using its [documented `@AGENTS.md` syntax](https://code.claude.com/docs/en/memory#import-additional-files).
+Recognized editable framework starter exports receive intent documentation in
+both modes; the option controls standards tooling and lint enforcement.
+Existing Expo lint configurations retain their rules and receive the starter's
+file-specific web hydration compatibility setting when needed.
+
+Set `"enforceCodeStandards": true` in the input configuration or select the
+wizard option to enforce standards through the normal `lint` command. The option
+defaults to `false`, including for older input files. Enabled projects receive
+`tools/check-code-standards.mjs` and a compatible TypeScript development dependency.
+Existing framework lint runs first; standalone applications, workspace apps,
+shared packages, and the Convex backend also run the standards check. The root
+check scans the whole workspace and excludes dependencies, build outputs, and
+machine-generated files such as Convex `_generated` bindings. The checker errors
+on barrel exports and missing public intent documentation, and warns on control
+flow nested more than three levels. Naming and simplicity remain review guidance.
+Captain-owned names use complete words such as `configuration` and
+`environmentExample`. Established acronyms and external contracts retain their
+names, including `--config`, JSON `auth`, Convex `args`, Next.js `config`, and
+framework imports such as `defineConfig` and `AuthConfig`.
+The generated checker runs independently of Captain and can also be invoked with
+`node tools/check-code-standards.mjs [scan roots]`; its default root is the current
+directory. Disabled enforcement adds guidance without standards tooling,
+dependencies, or lint scripts.
 
 ## Develop CAPTAIN
 

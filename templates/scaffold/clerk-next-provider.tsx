@@ -3,7 +3,8 @@
 import { ClerkProvider } from "@clerk/nextjs";
 import type { PropsWithChildren } from "react";
 
-export function CaptainAuthProvider({ children }: PropsWithChildren) {
+/** Provides Clerk authentication to the application. */
+export function AuthenticationProvider({ children }: PropsWithChildren) {
   const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
   if (!publishableKey) {

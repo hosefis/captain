@@ -1,5 +1,5 @@
 /* eslint-disable */
-// Preseeded by CAPTAIN. `convex dev` replaces this with Convex-generated code.
+// `convex dev` replaces this file with generated bindings.
 import type { DataModelFromSchemaDefinition, DocumentByName, TableNamesInDataModel, SystemTableNames } from "convex/server";
 import type { GenericId } from "convex/values";
 import schema from "../schema.js";

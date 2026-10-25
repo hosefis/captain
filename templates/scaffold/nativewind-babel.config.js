@@ -1,3 +1,4 @@
+/** Configures Expo transpilation and NativeWind JSX support. */
 module.exports = function (api) {
   api.cache(true);
   return {

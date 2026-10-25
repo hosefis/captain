@@ -20,12 +20,12 @@ const root = process.env.CAPTAIN_MATRIX_ROOT
   : mkdtempSync(join(tmpdir(), `captain-live-${packageManager}-${topology}-${backend}-`));
 mkdirSync(root, { recursive: true });
 const target = join(root, "generated");
-const configPath = join(root, "project.json");
+const configurationPath = join(root, "project.json");
 const hasMobile = topology === "mobile" || topology === "monorepo";
 const hasWeb = topology === "web" || topology === "monorepo";
 
 writeFileSync(
-  configPath,
+  configurationPath,
   `${JSON.stringify(
     {
       name: `captain-${packageManager}-${topology}`,
@@ -59,7 +59,7 @@ writeFileSync(
 
 const result = spawnSync(
   process.execPath,
-  ["dist/cli.js", target, "--config", configPath, "--yes", "--json"],
+  ["dist/cli.js", target, "--config", configurationPath, "--yes", "--json"],
   { cwd: process.cwd(), stdio: "inherit", shell: false },
 );
 

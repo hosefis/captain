@@ -8,8 +8,9 @@ export interface GlobalCliOptions {
   verifyDocs?: boolean;
 }
 
+/** Read global flags with consistent defaults from any CLI command. */
 export function getGlobalOptions(command: Command): GlobalCliOptions {
-  const opts = command.optsWithGlobals() as {
+  const options = command.optsWithGlobals() as {
     config?: string;
     yes?: boolean;
     dryRun?: boolean;
@@ -18,14 +19,15 @@ export function getGlobalOptions(command: Command): GlobalCliOptions {
   };
 
   return {
-    config: opts.config,
-    yes: opts.yes ?? false,
-    dryRun: opts.dryRun ?? false,
-    json: opts.json ?? false,
-    verifyDocs: opts.verifyDocs ?? false,
+    config: options.config,
+    yes: options.yes ?? false,
+    dryRun: options.dryRun ?? false,
+    json: options.json ?? false,
+    verifyDocs: options.verifyDocs ?? false,
   };
 }
 
+/** Report an unavailable command and stop with a failure status. */
 export function exitStub(commandName: string): never {
   console.error(`${commandName} is not yet implemented.`);
   process.exit(1);

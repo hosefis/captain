@@ -1,6 +1,6 @@
 {
   "name": "create-captain",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "CAPTAIN — Create Apps Properly: Templates, Adapters, Integrations, Now",
   "type": "module",
   "license": "MIT",
@@ -22,7 +22,9 @@
     "dist",
     "templates",
     "compatibility.json",
-    "doc-versions.json"
+    "doc-versions.json",
+    "AGENTS.md",
+    "scripts/check-code-standards.mjs"
   ],
   "scripts": {
     "build": "tsup",
@@ -31,9 +33,10 @@
     "canary:published": "node scripts/run-package-canary.mjs published",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
+    "lint": "node scripts/check-code-standards.mjs && tsc --noEmit",
     "test": "vitest run",
     "test:release": "node --test scripts/release-version.test.mjs",
+    "test:standards": "node --test scripts/check-code-standards.test.mjs",
     "test:matrix": "vitest run src/integration/tier-a-golden.test.ts",
     "test:watch": "vitest"
   },
