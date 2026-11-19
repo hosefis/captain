@@ -2,10 +2,13 @@ name: Live generation matrix
 
 on:
   schedule:
-    - cron: "17 3 * * *"
+    - cron: "17 3 * * 1"
   release:
     types: [published]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   generate:
@@ -41,3 +44,40 @@ jobs:
             !matrix-output/generated/**/.git/**
             !matrix-output/generated/**/.next/**
           if-no-files-found: warn
+
+  report-failure:
+    needs: generate
+    if: failure() && needs.generate.result == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    concurrency:
+      group: live-generation-failure-issue
+      cancel-in-progress: false
+    steps:
+      - name: Create or update the failure issue
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const marker = '<!-- captain-live-generation-failure -->';
+            const title = 'Live generation matrix failed';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `${marker}\nLatest failure: [workflow run](${runUrl}). See the failed jobs and diagnostic artifacts.`;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              ...context.repo,
+              state: 'all',
+              per_page: 100,
+            });
+            const existingIssue = issues.find((issue) =>
+              !issue.pull_request && issue.body?.includes(marker)
+            );
+            if (existingIssue) {
+              await github.rest.issues.update({
+                ...context.repo,
+                issue_number: existingIssue.number,
+                state: 'open',
+                body,
+              });
+              return;
+            }
+            await github.rest.issues.create({ ...context.repo, title, body });
